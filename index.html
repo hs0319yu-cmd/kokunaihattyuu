@@ -60,7 +60,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div class="app">
 <header><div><h1>国内仕入れ FAX注文書</h1><p>仕入れ先を登録して、注文書を作成・FAX送信できます</p></div>
 <div class="screen-actions"><button onclick="newOrder()">新規注文</button></div></header>
-<div class="notice">FAX送信：注文書を印刷し、プリンター選択で <b>「Kyocera TASKalfa 4054ci(J) NW-FAX」</b> を選んでください。次に京セラのFAX番号入力画面が開きます。</div>
+<div class="notice">FAX送信：「FAX送る」を押し、印刷画面のプリンターで <b>「Kyocera TASKalfa 4054ci(J) NW-FAX」</b> を選択してください。次に京セラのFAX番号入力画面が開きます。</div>
 
 <section class="card supplier-card">
 <h2>① 仕入れ先・FAX番号</h2>
@@ -299,10 +299,10 @@ async function downloadOrderPdf(){
  window.print();
 }
 async function sendFax(){
- $('sendMethod').value='network';
+ // Kyocera NW-FAX はPCに登録されたFAXプリンタードライバーを使用する
+ // 「複合機FAX」扱い。ブラウザーからプリンター自体の自動選択はできない。
+ $('sendMethod').value='device';
  if(!await buildPrintDocument())return;
- // WebブラウザーからネットFAXサービスへ直接送信する連携は未設定のため、
- // ネットFAXを選択した状態で注文書を印刷/PDF化する画面を開きます。
  const oldTitle=document.title;
  const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
  document.title='注文書_'+base;
