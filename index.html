@@ -278,7 +278,7 @@ function newOrder(){if(confirm('注文内容をクリアして新規注文にし
 function saveDraft(){let data={date:$('orderDate').value,no:$('orderNo').value,sender:$('sender').value,subject:$('subject').value,notes:$('notes').value,supplier:$('supplierName').value,fax:$('supplierFax').value,address:$('supplierAddress').value,items:[...document.querySelectorAll('#itemRows tr')].map(r=>[r.querySelector('.iname').value,r.querySelector('.qty').value])};localStorage.setItem('faxorder_draft',JSON.stringify(data));alert('このブラウザーに注文内容を一時保存しました。')}
 async function saveOrderHistory(rows){
  const now=new Date(),no=$('orderNo').value.trim()||('AUTO-'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'-'+now.getTime().toString().slice(-6)+'-'+Math.random().toString(36).slice(2,6));
- const record={id:no,date:$('orderDate').value||now.toISOString().slice(0,10),createdAt:now.toISOString(),operator:$('sender').value.trim(),supplier:$('supplierName').value.trim(),fax:$('supplierFax').value.trim(),items:rows.map((x,i)=>({id:no+'-'+i,name:x.name,qty:x.qty,received:false})),notes:$('notes').value};
+ const record={id:no,date:$('orderDate').value||now.toISOString().slice(0,10),createdAt:now.toISOString(),operator:$('sender').value.trim(),supplier:$('supplierName').value.trim(),fax:$('supplierFax').value.trim(),items:rows.map((x,i)=>({id:no+'-'+i,maker:x.maker||'',name:x.name,qty:x.qty,received:false})),notes:$('notes').value};
  // 同じ注文番号がある場合は確認を挟まず最新内容で更新する。
  setSharedStatus('注文履歴を共有保存しています…');
  try{const saved=await apiCall('saveOrder',{record});const ix=orders.findIndex(o=>o.id===saved.id);if(ix>=0)orders[ix]=saved;else orders.unshift(saved);$('orderNo').value=no;renderHistory();setSharedStatus('注文履歴を全員に共有しました');return true;}catch(e){setSharedStatus('注文履歴の保存に失敗しました');alert('共有保存に失敗しました。印刷前に通信状態を確認してください。\n'+e.message);return false;}
@@ -321,8 +321,15 @@ async function confirmPdfDownload(){
 
 function getOrderRows(){
  return [...document.querySelectorAll('#itemRows tr')]
-   .map(r=>({name:r.querySelector('.iname').value,qty:r.querySelector('.qty').value}))
-   .filter(x=>x.name||x.qty);
+   .map(r=>{
+     const makerKey=r.querySelector('.db-maker')?.value||'';
+     return {
+       maker:makerKey?makerLabel(makerKey):'',
+       name:r.querySelector('.iname').value.trim(),
+       qty:r.querySelector('.qty').value
+     };
+   })
+   .filter(x=>x.name||x.qty||x.maker);
 }
 async function sendFax(){
  // Kyocera NW-FAX はPCに登録されたFAXプリンタードライバーを使用する。
@@ -336,13 +343,9 @@ async function sendFax(){
  }finally{
    document.title=oldTitle;
  }
- // ブラウザーは印刷ダイアログで「印刷」と「キャンセル」を区別して通知しないため、
- // ダイアログ終了後に完了確認を行い、OKの場合だけ履歴を保存する。
- if(confirm('FAX送信（または印刷）は完了しましたか？\\n\\n［OK］完了したので注文履歴に登録\\n［キャンセル］中止したので登録しない')){
-   await saveOrderHistory(getOrderRows());
- }else{
-   setSharedStatus('印刷・FAXはキャンセル扱いです。注文履歴には登録していません。');
- }
+ // PDF保存時だけ注文履歴へ登録する。FAX画面を閉じても履歴は作成しない。
+ // ブラウザーの印刷画面は送信とキャンセルを判別できないため、確認ダイアログも表示しない。
+ setSharedStatus('FAX画面を終了しました。注文履歴への登録はPDF保存時のみ行います。');
 }
 async function buildPrintDocument(){
  if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){
@@ -350,7 +353,7 @@ async function buildPrintDocument(){
  }
  const rows=getOrderRows();
  if(!rows.length){alert('商品名または数量を1件以上入力してください。');return false;}
- $('printarea').innerHTML=`<h1>注文書</h1><div class="phead"><div class="pbox" style="width:58%"><div><b class="p-recipient">${esc($('supplierName').value)} 御中</b>${esc($('supplierAddress').value)?'<div>'+esc($('supplierAddress').value)+'</div>':''}</div></div><div style="text-align:right">注文日：${esc($('orderDate').value)}<br>注文番号：${esc($('orderNo').value)}<br><br>担当：${esc($('sender').value)}</div></div><p>件名：${esc($('subject').value)}</p><p>下記の通り注文いたします。</p><table class="pitems"><thead><tr><th>商品名・規格</th><th>数量</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.name)}</td><td style="text-align:right">${esc(x.qty)}</td></tr>`).join('')}${Array.from({length:Math.max(1,5-rows.length)},()=>'<tr><td>&nbsp;</td><td></td></tr>').join('')}</tbody></table><div class="pnote"><b>備考</b><br>${esc($('notes').value)}</div>${sealData?`<div class="pissuer"><img class="pseal" src="${sealData}" alt="社判"></div>`:''}`;
+ $('printarea').innerHTML=`<h1>注文書</h1><div class="phead"><div class="pbox" style="width:58%"><div><b class="p-recipient">${esc($('supplierName').value)} 御中</b>${esc($('supplierAddress').value)?'<div>'+esc($('supplierAddress').value)+'</div>':''}</div></div><div style="text-align:right">注文日：${esc($('orderDate').value)}<br>注文番号：${esc($('orderNo').value)}<br><br>担当：${esc($('sender').value)}</div></div><p>件名：${esc($('subject').value)}</p><p>下記の通り注文いたします。</p><table class="pitems"><thead><tr><th>メーカー名</th><th>商品名・規格</th><th>数量</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.maker||'')}</td><td>${esc(x.name)}</td><td style="text-align:right">${esc(x.qty)}</td></tr>`).join('')}${Array.from({length:Math.max(1,5-rows.length)},()=>'<tr><td>&nbsp;</td><td></td><td></td></tr>').join('')}</tbody></table><div class="pnote"><b>備考</b><br>${esc($('notes').value)}</div>${sealData?`<div class="pissuer"><img class="pseal" src="${sealData}" alt="社判"></div>`:''}`;
  return true;
 }
 function setSharedStatus(msg){const el=$('sharedStatus');if(el)el.textContent=msg}
