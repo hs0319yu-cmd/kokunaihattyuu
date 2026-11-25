@@ -42,6 +42,12 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 }
 .printarea{display:none}
 .history-order{border:1px solid #d8dee8;border-radius:9px;padding:12px;margin:12px 0}
+.history-item-name{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.item-status{display:inline-flex;align-items:center;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700;white-space:nowrap}
+.item-status.pending{color:#b42318;background:#fee4e2}
+.item-status.received{color:#067647;background:#d1fadf}
+.history-table .status-select{font-size:12px;padding:4px 6px;max-width:105px}
+
 .history-order-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .history-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
 .history-table th,.history-table td{border:1px solid #d8dee8;padding:8px;text-align:left}
@@ -85,7 +91,11 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div class="actions"><button onclick="addItem()">＋ 商品行を追加</button></div>
 <div style="margin-top:15px"><label>備考</label><textarea id="notes" placeholder="納期・配送先・その他"></textarea></div>
 <div class="grid" style="margin-top:14px"><div><label>社判画像（初回のみ登録）</label><input id="sealFile" type="file" accept="image/*"><p class="small">透過PNG推奨。社判画像はこの端末のブラウザーに保存されます（注文履歴・仕入先情報とは別管理）。</p><button type="button" onclick="clearSeal()">登録した社判を削除</button><div id="sealPreview"></div></div><div><label>署名・発行元</label><div style="padding:12px;border:1px solid #d8dee8;border-radius:8px;background:#f8fafc"><span class="small">社判を登録すると、注文書には社判画像のみを印刷し、「株式会社竹山商事」の文字は重ねて印刷しません。</span></div></div></div>
-<div class="actions screen-actions"><button class="primary" onclick="previewPrint()">注文書を印刷 / FAX送信へ</button><button class="green" onclick="downloadOrderPdf()">注文書をPDFとして保存</button><button onclick="saveDraft()">注文内容を一時保存</button></div>
+<div class="grid screen-actions" style="margin-top:14px">
+<div><label for="outputFormat">出力形式</label><select id="outputFormat"><option value="pdf" selected>PDF</option></select></div>
+<div><label for="sendMethod">送信方法</label><select id="sendMethod"><option value="device">複合機FAX</option><option value="network">ネットFAX</option></select></div>
+</div>
+<div class="actions screen-actions"><button class="primary" onclick="previewPrint()">注文書を印刷</button><button class="green" onclick="downloadOrderPdf()">PDFダウンロード</button><button class="primary" onclick="sendFax()">FAX送る</button><button onclick="saveDraft()">注文内容を一時保存</button></div>
 </section>
 <section class="card history-card"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
 </div>
@@ -267,7 +277,7 @@ async function saveOrderHistory(rows){
 function renderHistory(){
  const q=($('historySearch')?.value||'').trim().toLowerCase(),f=$('historyFilter')?.value||'all';
  const list=orders.filter(o=>{const hay=[o.id,o.date,o.operator,o.supplier,...o.items.map(i=>i.name)].join(' ').toLowerCase(),done=o.items.length>0&&o.items.every(i=>i.received);return(!q||hay.includes(q))&&(f==='all'||(f==='pending'&&!done)||(f==='received'&&done));});
- $('historyList').innerHTML=list.length?list.map(o=>`<div class="history-order"><div class="history-order-head"><div><b>注文番号：${esc(o.id)}</b><br>${esc(o.createdAt?new Date(o.createdAt).toLocaleString('ja-JP'):o.date)}　注文者：${esc(o.operator||'未入力')}　仕入れ先：${esc(o.supplier)}</div><button class="danger" onclick="deleteOrder('${esc(o.id)}')">履歴削除</button></div><table class="history-table"><thead><tr><th>商品名</th><th>数量</th><th>入荷状況</th></tr></thead><tbody>${o.items.map(it=>`<tr><td>${esc(it.name)}</td><td>${esc(it.qty)}</td><td><select class="status-select" onchange="setReceived('${esc(o.id)}','${esc(it.id)}',this.value)"><option value="0" ${!it.received?'selected':''}>未入荷</option><option value="1" ${it.received?'selected':''}>入荷済</option></select></td></tr>`).join('')}</tbody></table></div>`).join(''):'<p class="small">該当する注文履歴はありません。</p>';
+ $('historyList').innerHTML=list.length?list.map(o=>`<div class="history-order"><div class="history-order-head"><div><b>注文番号：${esc(o.id)}</b><br>${esc(o.createdAt?new Date(o.createdAt).toLocaleString('ja-JP'):o.date)}　注文者：${esc(o.operator||'未入力')}　仕入れ先：${esc(o.supplier)}</div><button class="danger" onclick="deleteOrder('${esc(o.id)}')">履歴削除</button></div><table class="history-table"><thead><tr><th>商品名</th><th>数量</th><th>入荷状況</th></tr></thead><tbody>${o.items.map(it=>`<tr><td><div class="history-item-name"><span>${esc(it.name)}</span><span class="item-status ${it.received?'received':'pending'}">${it.received?'入荷済':'未入荷'}</span></div></td><td>${esc(it.qty)}</td><td><select class="status-select" aria-label="入荷状況" onchange="setReceived('${esc(o.id)}','${esc(it.id)}',this.value)"><option value="0" ${!it.received?'selected':''}>未入荷</option><option value="1" ${it.received?'selected':''}>入荷済</option></select></td></tr>`).join('')}</tbody></table></div>`).join(''):'<p class="small">該当する注文履歴はありません。</p>';
 }
 async function setReceived(oid,iid,v){const received=v==='1';setSharedStatus('入荷状況を更新しています…');try{const data=await apiCall('setReceived',{orderId:oid,itemId:iid,received});orders=data.orders||orders;renderHistory();setSharedStatus('入荷状況を全員に共有しました')}catch(e){alert('入荷状況を保存できませんでした。再読み込みして確認してください。\n'+e.message);setSharedStatus('入荷状況の更新に失敗しました')}}
 async function deleteOrder(id){if(!confirm('この注文履歴を全員の共有履歴から削除しますか？'))return;setSharedStatus('履歴を削除しています…');try{const data=await apiCall('deleteOrder',{orderId:id});orders=data.orders||[];renderHistory();setSharedStatus('履歴を共有削除しました')}catch(e){alert('履歴を削除できませんでした。'+e.message);setSharedStatus('履歴削除に失敗しました')}}
@@ -279,7 +289,20 @@ async function previewPrint(){
  window.print();
 }
 async function downloadOrderPdf(){
+ $('outputFormat').value='pdf';
  if(!await buildPrintDocument())return;
+ const oldTitle=document.title;
+ const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
+ document.title='注文書_'+base;
+ const restore=()=>{document.title=oldTitle;window.removeEventListener('afterprint',restore);};
+ window.addEventListener('afterprint',restore);
+ window.print();
+}
+async function sendFax(){
+ $('sendMethod').value='network';
+ if(!await buildPrintDocument())return;
+ // WebブラウザーからネットFAXサービスへ直接送信する連携は未設定のため、
+ // ネットFAXを選択した状態で注文書を印刷/PDF化する画面を開きます。
  const oldTitle=document.title;
  const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
  document.title='注文書_'+base;
