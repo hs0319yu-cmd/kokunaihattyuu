@@ -291,12 +291,68 @@ async function previewPrint(){
 async function downloadOrderPdf(){
  $('outputFormat').value='pdf';
  if(!await buildPrintDocument())return;
- const oldTitle=document.title;
+
+ // PDFは印刷ダイアログを経由せず、PDFファイルとして直接保存する。
+ // html2pdf.js は初回のみCDNから読み込みます。
+ if(!window.html2pdf){
+   try{
+     await new Promise((resolve,reject)=>{
+       const script=document.createElement('script');
+       script.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+       script.onload=resolve;
+       script.onerror=()=>reject(new Error('PDF作成ライブラリを読み込めませんでした。インターネット接続を確認してください。'));
+       document.head.appendChild(script);
+     });
+   }catch(err){
+     alert(err.message);
+     return;
+   }
+ }
+ const area=$('printarea');
  const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
- document.title='注文書_'+base;
- const restore=()=>{document.title=oldTitle;window.removeEventListener('afterprint',restore);};
- window.addEventListener('afterprint',restore);
- window.print();
+ const fileName='注文書_'+base+'.pdf';
+
+ // 画面表示用の一時スタイル。印刷用レイアウトをPDF生成時にも適用する。
+ const style=document.createElement('style');
+ style.id='pdf-export-style';
+ style.textContent=`
+   #printarea.pdf-export{display:block!important;position:fixed;left:-10000px;top:0;width:794px;
+     box-sizing:border-box;background:#fff;color:#000;padding:30px;
+     font-family:"Yu Gothic","Meiryo",sans-serif;font-size:12px;line-height:1.15}
+   #printarea.pdf-export h1{text-align:center;font-size:24px;border-bottom:2px solid #000;padding-bottom:6px;margin:0 0 12px}
+   #printarea.pdf-export .phead{display:flex;justify-content:space-between;margin:10px 0}
+   #printarea.pdf-export .pbox{border:1px solid #000;padding:7px;min-height:0;display:flex;align-items:center}
+   #printarea.pdf-export .p-recipient{display:inline-block;font-size:27px;line-height:1.1;margin-bottom:3px}
+   #printarea.pdf-export .pitems{width:100%;border-collapse:collapse;margin-top:10px}
+   #printarea.pdf-export .pitems th,#printarea.pdf-export .pitems td{border:1px solid #000;padding:4px 6px;font-size:11px;line-height:1.1}
+   #printarea.pdf-export .pitems th:first-child,#printarea.pdf-export .pitems td:first-child{font-size:14px}
+   #printarea.pdf-export .pitems th:last-child,#printarea.pdf-export .pitems td:last-child{width:42px;white-space:nowrap;padding-left:3px;padding-right:3px}
+   #printarea.pdf-export .pitems th{background:#eee}
+   #printarea.pdf-export .pnote{border:1px solid #000;padding:7px;min-height:48px;margin-top:10px;white-space:pre-wrap}
+   #printarea.pdf-export .tot{text-align:right;font-size:14px;margin-top:10px}
+   #printarea.pdf-export .pissuer{display:flex;justify-content:flex-end;align-items:flex-end;gap:24px;margin-top:15px}
+   #printarea.pdf-export .pseal{width:300px;height:220px;margin-right:-12px;object-fit:contain;object-position:center bottom}
+   #printarea.pdf-export .psign{text-align:right;min-width:175px;line-height:1.35;padding-bottom:8px}
+   #printarea.pdf-export .psign strong{font-size:14px}
+ `;
+ document.head.appendChild(style);
+ area.classList.add('pdf-export');
+ try{
+   await window.html2pdf().set({
+     margin:[8,8,8,8],
+     filename:fileName,
+     image:{type:'jpeg',quality:0.98},
+     html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false},
+     jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+     pagebreak:{mode:['css','legacy']}
+   }).from(area).save();
+ }catch(err){
+   console.error(err);
+   alert('PDFの作成に失敗しました。もう一度お試しください。');
+ }finally{
+   area.classList.remove('pdf-export');
+   style.remove();
+ }
 }
 async function sendFax(){
  // Kyocera NW-FAX はPCに登録されたFAXプリンタードライバーを使用する
