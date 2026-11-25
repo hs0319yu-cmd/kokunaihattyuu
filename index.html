@@ -109,7 +109,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div><label for="outputFormat">出力形式</label><select id="outputFormat"><option value="pdf" selected>PDF</option></select></div>
 <div><label for="sendMethod">送信方法</label><select id="sendMethod"><option value="device">複合機FAX</option><option value="network">ネットFAX</option></select></div>
 </div>
-<div class="actions screen-actions"><button class="green" onclick="downloadOrderPdf()">PDFダウンロード</button><button class="primary" onclick="sendFax()">FAX送る</button><button onclick="saveDraft()">注文内容を一時保存</button></div>
+<div class="actions screen-actions"><button class="primary" onclick="sendFax()">FAX送る</button><button onclick="saveDraft()">注文内容を一時保存</button></div>
 </section>
 <section class="card history-card"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
 </div>
