@@ -285,63 +285,22 @@ function loadSeal(){sealData=localStorage.getItem('faxorder_seal')||'';$('sealPr
 function clearSeal(){if(!confirm('登録した社判画像を削除しますか？'))return;localStorage.removeItem('faxorder_seal');sealData='';$('sealFile').value='';loadSeal();}
 $('sealFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;if(!f.type.startsWith('image/')){alert('画像ファイルを選択してください。');return;}const r=new FileReader();r.onload=()=>{sealData=r.result;try{localStorage.setItem('faxorder_seal',sealData);loadSeal();alert('社判画像を登録しました。');}catch(err){alert('画像サイズが大きすぎます。小さいPNG/JPG画像を使用してください。');}};r.readAsDataURL(f);});
 async function downloadOrderPdf(){
+ // Chrome標準の印刷プレビューを開く。PDF保存は印刷画面の送信先で選択する。
  $('outputFormat').value='pdf';
- // Open a tab immediately from the click gesture so the browser does not block the preview.
- const preview=window.open('about:blank','_blank');
- if(!preview){alert('PDFプレビューを開けませんでした。ブラウザーのポップアップブロックを解除してください。');return;}
- preview.document.write('<!doctype html><meta charset="utf-8"><title>注文書PDFプレビュー</title><p style="font-family:sans-serif;padding:24px">PDFを作成しています…</p>');
- if(!await buildPrintDocument()){preview.close();return;}
- if(!window.html2pdf){
-   try{
-     await new Promise((resolve,reject)=>{
-       const script=document.createElement('script');
-       script.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-       script.onload=resolve;
-       script.onerror=()=>reject(new Error('PDF作成ライブラリを読み込めませんでした。インターネット接続を確認してください。'));
-       document.head.appendChild(script);
-     });
-   }catch(err){preview.close();alert(err.message);return;}
- }
- const source=$('printarea');
+ if(!await buildPrintDocument())return;
+ const oldTitle=document.title;
  const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
- const fileName='注文書_'+base+'.pdf';
- // Capture a visible, self-contained clone. The original print area is intentionally hidden on screen.
- const exportNode=source.cloneNode(true);
- exportNode.removeAttribute('id');
- exportNode.style.cssText='display:block!important;position:absolute!important;left:0!important;top:0!important;width:794px!important;min-height:1123px!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;padding:30px!important;font-family:"Yu Gothic","Meiryo",sans-serif;font-size:12px;line-height:1.25;';
- exportNode.querySelectorAll('h1').forEach(el=>el.style.cssText='text-align:center;font-size:24px;border-bottom:2px solid #000;padding-bottom:8px;margin:0 0 16px;');
- exportNode.querySelectorAll('.phead').forEach(el=>el.style.cssText='display:flex;justify-content:space-between;margin:10px 0;');
- exportNode.querySelectorAll('.pbox').forEach(el=>el.style.cssText+='border:1px solid #000;padding:8px;display:flex;align-items:center;');
- exportNode.querySelectorAll('.p-recipient').forEach(el=>el.style.cssText='display:inline-block;font-size:27px;line-height:1.2;margin-bottom:4px;');
- exportNode.querySelectorAll('.pitems').forEach(el=>el.style.cssText='width:100%;border-collapse:collapse;margin-top:12px;');
- exportNode.querySelectorAll('.pitems th,.pitems td').forEach(el=>el.style.cssText='border:1px solid #000;padding:6px;font-size:12px;line-height:1.2;');
- exportNode.querySelectorAll('.pnote').forEach(el=>el.style.cssText='border:1px solid #000;padding:8px;min-height:55px;margin-top:12px;white-space:pre-wrap;');
- exportNode.querySelectorAll('.pissuer').forEach(el=>el.style.cssText='display:flex;justify-content:flex-end;align-items:flex-end;margin-top:18px;');
- exportNode.querySelectorAll('.pseal').forEach(el=>el.style.cssText='width:220px;max-height:160px;object-fit:contain;');
- document.body.appendChild(exportNode);
+ document.title='注文書_'+base;
+ setSharedStatus('印刷プレビューを開いています。送信先で「PDFに保存」を選択してください。');
+ // PDF保存/キャンセルの区別はブラウザーから取得できないため、
+ // PDF操作では履歴を自動登録しない（キャンセル時の誤登録を防ぐ）。
  try{
-   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-   await Promise.all([...exportNode.querySelectorAll('img')].map(img=>img.decode?img.decode().catch(()=>{}):Promise.resolve()));
-   const blob=await window.html2pdf().set({
-     margin:[8,8,8,8],
-     image:{type:'jpeg',quality:0.98},
-     html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,windowWidth:794},
-     jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-     pagebreak:{mode:['css','legacy']}
-   }).from(exportNode).outputPdf('blob');
-   if(!blob||blob.size<1000)throw new Error('PDFの内容が空でした。');
-   const pdfUrl=URL.createObjectURL(blob);
-   preview.document.open();
-   preview.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${fileName}</title><style>html,body{margin:0;height:100%;font-family:Arial,sans-serif}header{height:48px;display:flex;align-items:center;gap:16px;padding:0 16px;background:#263445;color:white}a{color:white}iframe{width:100%;height:calc(100% - 48px);border:0}</style></head><body><header><strong>注文書PDFプレビュー</strong><a href="${pdfUrl}" download="${fileName}" onclick="if(window.opener&&!window.opener.closed){window.opener.saveOrderHistory(window.opener.getOrderRows());}document.getElementById('downloadStatus').textContent='ダウンロードを開始しました。注文履歴に登録しています。';">このPDFをダウンロード</a><span id="downloadStatus" style="color:white;font-size:12px">プレビューを閉じると注文履歴には登録されません。</span></header><iframe src="${pdfUrl}"></iframe></body></html>`);
-   preview.document.close();
- }catch(err){
-   console.error(err);
-   preview.document.body.innerHTML='<p style="font-family:sans-serif;padding:24px;color:#b00">PDFの作成に失敗しました。注文履歴には登録していません。<br>'+esc(err.message||'')+'</p>';
-   alert('PDFの作成に失敗しました。注文履歴には登録していません。\n'+(err.message||''));
+   window.print();
  }finally{
-   exportNode.remove();
+   document.title=oldTitle;
  }
 }
+
 function getOrderRows(){
  return [...document.querySelectorAll('#itemRows tr')]
    .map(r=>({name:r.querySelector('.iname').value,qty:r.querySelector('.qty').value}))
@@ -379,7 +338,7 @@ async function buildPrintDocument(){
 function setSharedStatus(msg){const el=$('sharedStatus');if(el)el.textContent=msg}
 async function refreshSharedData(silent=false){if(!silent)setSharedStatus('共有データを読み込んでいます…');try{const data=await apiCall('getData');suppliers=data.suppliers||[];orders=data.orders||[];sharedReady=true;renderSuppliers();renderHistory();if(!silent)setSharedStatus('共有データに接続中｜変更は約30秒以内に他の端末へ反映されます')}catch(e){if(!silent){setSharedStatus('共有データに接続できません。GASの公開設定・config.jsのURLを確認してください。');alert('共有データに接続できませんでした。\n'+e.message)}}}
 $('orderDate').value=new Date().toISOString().slice(0,10);renderSuppliers();addItem();loadSeal();renderHistory();
-let draft=JSON.parse(localStorage.getItem('faxorder_draft')||'null');$('sender').value=draft?.sender||localStorage.getItem('faxorder_sender')||'';if(draft){$('orderNo').value=draft.no||'';$('subject').value=draft.subject||'';$('notes').value=draft.notes||''}
+let draft=JSON.parse(localStorage.getItem('faxorder_draft')||'null');$('sender').value=localStorage.getItem('faxorder_sender')??draft?.sender??'';if(draft){$('orderNo').value=draft.no||'';$('subject').value=draft.subject||'';$('notes').value=draft.notes||''}
 $('sender').addEventListener('input',()=>localStorage.setItem('faxorder_sender',$('sender').value));refreshSharedData();setInterval(()=>refreshSharedData(true),30000);
 </script>
 </body></html>
