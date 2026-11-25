@@ -32,7 +32,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
  .printarea{display:block!important}.printarea{padding:0;font-family:"Yu Gothic","Meiryo",sans-serif;font-size:9pt;line-height:1.15}
  .printarea h1{text-align:center;font-size:18pt;border-bottom:1.5px solid #000;padding-bottom:4px;margin:0 0 8px}
  .phead{display:flex;justify-content:space-between;margin:8px 0}
- .pbox{border:1px solid #000;padding:5px;min-height:0;display:flex;align-items:center}
+ .pbox{border:0;padding:5px 0;min-height:0;display:flex;align-items:center}
  .p-recipient{display:inline-block;font-size:20pt;line-height:1.1;margin-bottom:2px}
  .pitems{width:100%;border-collapse:collapse;margin-top:8px}
  .pitems th,.pitems td{border:1px solid #000;padding:3px 5px;font-size:8.5pt;line-height:1.1}.pitems th:first-child,.pitems td:first-child{font-size:11pt}.pitems th:last-child,.pitems td:last-child{width:42px;white-space:nowrap;padding-left:3px;padding-right:3px}
@@ -54,6 +54,11 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 .history-table th{background:#f2f5f9}.status-select{max-width:130px;padding:6px}
 .seal-preview{max-width:110px;max-height:80px;object-fit:contain;margin-top:8px}
 @media print{.history-card{display:none!important}.pissuer{display:flex;justify-content:flex-end;align-items:flex-end;gap:24px;margin-top:12px;padding-right:0}.pseal{width:300px;height:220px;margin-right:-12px;object-fit:contain;object-position:center bottom}.psign{text-align:right;min-width:175px;line-height:1.35;padding-bottom:8px}.psign strong{font-size:11pt}}
+
+#pdfPreviewModal{display:none;position:fixed;inset:0;background:#0009;z-index:9999;padding:3vh 3vw}
+#pdfPreviewModal .pdf-panel{background:#fff;width:min(100%,1000px);height:94vh;margin:auto;border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+#pdfPreviewModal .pdf-toolbar{display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid #ddd}
+#pdfPreviewFrame{width:100%;height:100%;border:0;flex:1}
 </style>
 </head>
 <body>
@@ -100,6 +105,10 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <section class="card history-card"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
 </div>
 <div class="printarea" id="printarea"></div>
+<div id="pdfPreviewModal" role="dialog" aria-modal="true">
+ <div class="pdf-panel"><div class="pdf-toolbar"><b style="flex:1">注文書 PDF プレビュー</b><button class="green" onclick="confirmPdfDownload()">PDFを保存して注文履歴に登録</button><button onclick="closePdfPreview()">閉じる（登録しない）</button></div><iframe id="pdfPreviewFrame" title="注文書PDFプレビュー"></iframe></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="./config.js"></script>
 <script>
 const $=id=>document.getElementById(id);
@@ -284,21 +293,30 @@ async function deleteOrder(id){if(!confirm('この注文履歴を全員の共有
 function loadSeal(){sealData=localStorage.getItem('faxorder_seal')||'';$('sealPreview').innerHTML=sealData?'<img class="seal-preview" alt="登録済み社判" src="'+sealData+'">':'<span class="small">社判は未登録です。</span>';}
 function clearSeal(){if(!confirm('登録した社判画像を削除しますか？'))return;localStorage.removeItem('faxorder_seal');sealData='';$('sealFile').value='';loadSeal();}
 $('sealFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;if(!f.type.startsWith('image/')){alert('画像ファイルを選択してください。');return;}const r=new FileReader();r.onload=()=>{sealData=r.result;try{localStorage.setItem('faxorder_seal',sealData);loadSeal();alert('社判画像を登録しました。');}catch(err){alert('画像サイズが大きすぎます。小さいPNG/JPG画像を使用してください。');}};r.readAsDataURL(f);});
+let pendingPdfBlob=null,pendingPdfUrl=null;
 async function downloadOrderPdf(){
- // Chrome標準の印刷プレビューを開く。PDF保存は印刷画面の送信先で選択する。
  $('outputFormat').value='pdf';
  if(!await buildPrintDocument())return;
- const oldTitle=document.title;
- const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
- document.title='注文書_'+base;
- setSharedStatus('印刷プレビューを開いています。送信先で「PDFに保存」を選択してください。');
- // PDF保存/キャンセルの区別はブラウザーから取得できないため、
- // PDF操作では履歴を自動登録しない（キャンセル時の誤登録を防ぐ）。
+ if(typeof html2pdf==='undefined'){alert('PDF作成ライブラリを読み込めませんでした。インターネット接続を確認してください。');return;}
+ const source=$('printarea'),oldDisplay=source.style.display,oldPosition=source.style.position,oldLeft=source.style.left;
  try{
-   window.print();
- }finally{
-   document.title=oldTitle;
- }
+  source.style.display='block';source.style.position='fixed';source.style.left='-10000px';source.style.top='0';source.style.width='794px';source.style.background='#fff';source.style.color='#000';source.style.padding='0';
+  await Promise.all([...source.querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve})));
+  const opt={margin:8,filename:'注文書.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}};
+  pendingPdfBlob=await html2pdf().set(opt).from(source).outputPdf('blob');
+  if(pendingPdfUrl)URL.revokeObjectURL(pendingPdfUrl);
+  pendingPdfUrl=URL.createObjectURL(pendingPdfBlob);
+  $('pdfPreviewFrame').src=pendingPdfUrl;$('pdfPreviewModal').style.display='block';
+  setSharedStatus('PDFプレビューを表示しています。保存すると注文履歴に登録します。');
+ }catch(e){console.error(e);alert('PDFを作成できませんでした。'+(e.message||''));}
+ finally{source.style.display=oldDisplay;source.style.position=oldPosition;source.style.left=oldLeft;source.style.top='';source.style.width='';source.style.background='';source.style.color='';source.style.padding='';}
+}
+function closePdfPreview(){ $('pdfPreviewModal').style.display='none';$('pdfPreviewFrame').src='about:blank';pendingPdfBlob=null;if(pendingPdfUrl){URL.revokeObjectURL(pendingPdfUrl);pendingPdfUrl=null;}setSharedStatus('PDFプレビューを閉じました。注文履歴には登録していません。'); }
+async function confirmPdfDownload(){
+ if(!pendingPdfBlob)return;
+ const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
+ const a=document.createElement('a');a.href=pendingPdfUrl;a.download='注文書_'+base+'.pdf';document.body.appendChild(a);a.click();a.remove();
+ const rows=getOrderRows();closePdfPreview();await saveOrderHistory(rows);
 }
 
 function getOrderRows(){
