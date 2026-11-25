@@ -95,7 +95,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div><label for="outputFormat">出力形式</label><select id="outputFormat"><option value="pdf" selected>PDF</option></select></div>
 <div><label for="sendMethod">送信方法</label><select id="sendMethod"><option value="device">複合機FAX</option><option value="network">ネットFAX</option></select></div>
 </div>
-<div class="actions screen-actions"><button class="primary" onclick="previewPrint()">注文書を印刷</button><button class="green" onclick="downloadOrderPdf()">PDFダウンロード</button><button class="primary" onclick="sendFax()">FAX送る</button><button onclick="saveDraft()">注文内容を一時保存</button></div>
+<div class="actions screen-actions"><button class="green" onclick="downloadOrderPdf()">PDFダウンロード</button><button class="primary" onclick="sendFax()">FAX送る</button><button onclick="saveDraft()">注文内容を一時保存</button></div>
 </section>
 <section class="card history-card"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
 </div>
@@ -284,16 +284,9 @@ async function deleteOrder(id){if(!confirm('この注文履歴を全員の共有
 function loadSeal(){sealData=localStorage.getItem('faxorder_seal')||'';$('sealPreview').innerHTML=sealData?'<img class="seal-preview" alt="登録済み社判" src="'+sealData+'">':'<span class="small">社判は未登録です。</span>';}
 function clearSeal(){if(!confirm('登録した社判画像を削除しますか？'))return;localStorage.removeItem('faxorder_seal');sealData='';$('sealFile').value='';loadSeal();}
 $('sealFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;if(!f.type.startsWith('image/')){alert('画像ファイルを選択してください。');return;}const r=new FileReader();r.onload=()=>{sealData=r.result;try{localStorage.setItem('faxorder_seal',sealData);loadSeal();alert('社判画像を登録しました。');}catch(err){alert('画像サイズが大きすぎます。小さいPNG/JPG画像を使用してください。');}};r.readAsDataURL(f);});
-async function previewPrint(){
- if(!await buildPrintDocument())return;
- window.print();
-}
 async function downloadOrderPdf(){
  $('outputFormat').value='pdf';
  if(!await buildPrintDocument())return;
-
- // PDFは印刷ダイアログを経由せず、PDFファイルとして直接保存する。
- // html2pdf.js は初回のみCDNから読み込みます。
  if(!window.html2pdf){
    try{
      await new Promise((resolve,reject)=>{
@@ -303,21 +296,17 @@ async function downloadOrderPdf(){
        script.onerror=()=>reject(new Error('PDF作成ライブラリを読み込めませんでした。インターネット接続を確認してください。'));
        document.head.appendChild(script);
      });
-   }catch(err){
-     alert(err.message);
-     return;
-   }
+   }catch(err){alert(err.message);return;}
  }
  const area=$('printarea');
+ const rows=getOrderRows();
  const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
  const fileName='注文書_'+base+'.pdf';
-
- // 画面表示用の一時スタイル。印刷用レイアウトをPDF生成時にも適用する。
  const style=document.createElement('style');
- style.id='pdf-export-style';
  style.textContent=`
-   #printarea.pdf-export{display:block!important;position:fixed;left:-10000px;top:0;width:794px;
-     box-sizing:border-box;background:#fff;color:#000;padding:30px;
+   #printarea.pdf-export{display:block!important;position:fixed!important;left:0!important;top:0!important;
+     z-index:2147483000!important;width:794px!important;min-height:1123px;box-sizing:border-box;
+     background:#fff!important;color:#000!important;padding:30px!important;
      font-family:"Yu Gothic","Meiryo",sans-serif;font-size:12px;line-height:1.15}
    #printarea.pdf-export h1{text-align:center;font-size:24px;border-bottom:2px solid #000;padding-bottom:6px;margin:0 0 12px}
    #printarea.pdf-export .phead{display:flex;justify-content:space-between;margin:10px 0}
@@ -325,51 +314,67 @@ async function downloadOrderPdf(){
    #printarea.pdf-export .p-recipient{display:inline-block;font-size:27px;line-height:1.1;margin-bottom:3px}
    #printarea.pdf-export .pitems{width:100%;border-collapse:collapse;margin-top:10px}
    #printarea.pdf-export .pitems th,#printarea.pdf-export .pitems td{border:1px solid #000;padding:4px 6px;font-size:11px;line-height:1.1}
-   #printarea.pdf-export .pitems th:first-child,#printarea.pdf-export .pitems td:first-child{font-size:14px}
-   #printarea.pdf-export .pitems th:last-child,#printarea.pdf-export .pitems td:last-child{width:42px;white-space:nowrap;padding-left:3px;padding-right:3px}
    #printarea.pdf-export .pitems th{background:#eee}
    #printarea.pdf-export .pnote{border:1px solid #000;padding:7px;min-height:48px;margin-top:10px;white-space:pre-wrap}
-   #printarea.pdf-export .tot{text-align:right;font-size:14px;margin-top:10px}
    #printarea.pdf-export .pissuer{display:flex;justify-content:flex-end;align-items:flex-end;gap:24px;margin-top:15px}
-   #printarea.pdf-export .pseal{width:300px;height:220px;margin-right:-12px;object-fit:contain;object-position:center bottom}
-   #printarea.pdf-export .psign{text-align:right;min-width:175px;line-height:1.35;padding-bottom:8px}
-   #printarea.pdf-export .psign strong{font-size:14px}
+   #printarea.pdf-export .pseal{width:220px;max-height:160px;object-fit:contain;object-position:center bottom}
  `;
  document.head.appendChild(style);
  area.classList.add('pdf-export');
  try{
+   // Let the browser finish layout and image decoding before html2canvas captures it.
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   const imgs=[...area.querySelectorAll('img')];
+   await Promise.all(imgs.map(img=>img.decode?img.decode().catch(()=>{}):Promise.resolve()));
    await window.html2pdf().set({
      margin:[8,8,8,8],
      filename:fileName,
      image:{type:'jpeg',quality:0.98},
-     html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false},
+     html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,scrollX:0,scrollY:0},
      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
      pagebreak:{mode:['css','legacy']}
    }).from(area).save();
+   // A canceled/failed PDF creation never reaches this point, so no history is added.
+   await saveOrderHistory(rows);
  }catch(err){
    console.error(err);
-   alert('PDFの作成に失敗しました。もう一度お試しください。');
+   alert('PDFの作成に失敗しました。注文履歴には登録していません。\\n'+(err.message||''));
  }finally{
    area.classList.remove('pdf-export');
    style.remove();
  }
 }
+function getOrderRows(){
+ return [...document.querySelectorAll('#itemRows tr')]
+   .map(r=>({name:r.querySelector('.iname').value,qty:r.querySelector('.qty').value}))
+   .filter(x=>x.name||x.qty);
+}
 async function sendFax(){
- // Kyocera NW-FAX はPCに登録されたFAXプリンタードライバーを使用する
- // 「複合機FAX」扱い。ブラウザーからプリンター自体の自動選択はできない。
+ // Kyocera NW-FAX はPCに登録されたFAXプリンタードライバーを使用する。
  $('sendMethod').value='device';
  if(!await buildPrintDocument())return;
  const oldTitle=document.title;
  const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
  document.title='注文書_'+base;
- const restore=()=>{document.title=oldTitle;window.removeEventListener('afterprint',restore);};
- window.addEventListener('afterprint',restore);
- window.print();
+ try{
+   window.print();
+ }finally{
+   document.title=oldTitle;
+ }
+ // ブラウザーは印刷ダイアログで「印刷」と「キャンセル」を区別して通知しないため、
+ // ダイアログ終了後に完了確認を行い、OKの場合だけ履歴を保存する。
+ if(confirm('FAX送信（または印刷）は完了しましたか？\\n\\n［OK］完了したので注文履歴に登録\\n［キャンセル］中止したので登録しない')){
+   await saveOrderHistory(getOrderRows());
+ }else{
+   setSharedStatus('印刷・FAXはキャンセル扱いです。注文履歴には登録していません。');
+ }
 }
 async function buildPrintDocument(){
- if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){alert('仕入れ先名とFAX番号を入力してください。');return false}
- let rows=[...document.querySelectorAll('#itemRows tr')].map(r=>({name:r.querySelector('.iname').value,qty:r.querySelector('.qty').value})).filter(x=>x.name||x.qty);
- if(!await saveOrderHistory(rows))return false;
+ if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){
+   alert('仕入れ先名とFAX番号を入力してください。');return false;
+ }
+ const rows=getOrderRows();
+ if(!rows.length){alert('商品名または数量を1件以上入力してください。');return false;}
  $('printarea').innerHTML=`<h1>注文書</h1><div class="phead"><div class="pbox" style="width:58%"><div><b class="p-recipient">${esc($('supplierName').value)} 御中</b>${esc($('supplierAddress').value)?'<div>'+esc($('supplierAddress').value)+'</div>':''}</div></div><div style="text-align:right">注文日：${esc($('orderDate').value)}<br>注文番号：${esc($('orderNo').value)}<br><br>担当：${esc($('sender').value)}</div></div><p>件名：${esc($('subject').value)}</p><p>下記の通り注文いたします。</p><table class="pitems"><thead><tr><th>商品名・規格</th><th>数量</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.name)}</td><td style="text-align:right">${esc(x.qty)}</td></tr>`).join('')}${Array.from({length:Math.max(1,5-rows.length)},()=>'<tr><td>&nbsp;</td><td></td></tr>').join('')}</tbody></table><div class="pnote"><b>備考</b><br>${esc($('notes').value)}</div>${sealData?`<div class="pissuer"><img class="pseal" src="${sealData}" alt="社判"></div>`:''}`;
  return true;
 }
