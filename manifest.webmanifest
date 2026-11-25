@@ -1,8 +1,8 @@
 {
   "name": "国内仕入れ FAX注文書",
   "short_name": "FAX注文",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/kokunaihattyuu/",
+  "scope": "/kokunaihattyuu/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1769ff",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "id": "./"
+  "id": "/kokunaihattyuu/"
 }
