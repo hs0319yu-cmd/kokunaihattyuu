@@ -270,7 +270,7 @@ function saveDraft(){let data={date:$('orderDate').value,no:$('orderNo').value,s
 async function saveOrderHistory(rows){
  const now=new Date(),no=$('orderNo').value.trim()||('AUTO-'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'-'+now.getTime().toString().slice(-6)+'-'+Math.random().toString(36).slice(2,6));
  const record={id:no,date:$('orderDate').value||now.toISOString().slice(0,10),createdAt:now.toISOString(),operator:$('sender').value.trim(),supplier:$('supplierName').value.trim(),fax:$('supplierFax').value.trim(),items:rows.map((x,i)=>({id:no+'-'+i,name:x.name,qty:x.qty,received:false})),notes:$('notes').value};
- const old=orders.find(o=>o.id===no);if(old&&!confirm('同じ注文番号の履歴があります。内容を更新しますか？'))return false;
+ // 同じ注文番号がある場合は確認を挟まず最新内容で更新する。
  setSharedStatus('注文履歴を共有保存しています…');
  try{const saved=await apiCall('saveOrder',{record});const ix=orders.findIndex(o=>o.id===saved.id);if(ix>=0)orders[ix]=saved;else orders.unshift(saved);$('orderNo').value=no;renderHistory();setSharedStatus('注文履歴を全員に共有しました');return true;}catch(e){setSharedStatus('注文履歴の保存に失敗しました');alert('共有保存に失敗しました。印刷前に通信状態を確認してください。\n'+e.message);return false;}
 }
@@ -286,7 +286,11 @@ function clearSeal(){if(!confirm('登録した社判画像を削除しますか�
 $('sealFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;if(!f.type.startsWith('image/')){alert('画像ファイルを選択してください。');return;}const r=new FileReader();r.onload=()=>{sealData=r.result;try{localStorage.setItem('faxorder_seal',sealData);loadSeal();alert('社判画像を登録しました。');}catch(err){alert('画像サイズが大きすぎます。小さいPNG/JPG画像を使用してください。');}};r.readAsDataURL(f);});
 async function downloadOrderPdf(){
  $('outputFormat').value='pdf';
- if(!await buildPrintDocument())return;
+ // Open a tab immediately from the click gesture so the browser does not block the preview.
+ const preview=window.open('about:blank','_blank');
+ if(!preview){alert('PDFプレビューを開けませんでした。ブラウザーのポップアップブロックを解除してください。');return;}
+ preview.document.write('<!doctype html><meta charset="utf-8"><title>注文書PDFプレビュー</title><p style="font-family:sans-serif;padding:24px">PDFを作成しています…</p>');
+ if(!await buildPrintDocument()){preview.close();return;}
  if(!window.html2pdf){
    try{
      await new Promise((resolve,reject)=>{
@@ -296,52 +300,46 @@ async function downloadOrderPdf(){
        script.onerror=()=>reject(new Error('PDF作成ライブラリを読み込めませんでした。インターネット接続を確認してください。'));
        document.head.appendChild(script);
      });
-   }catch(err){alert(err.message);return;}
+   }catch(err){preview.close();alert(err.message);return;}
  }
- const area=$('printarea');
- const rows=getOrderRows();
+ const source=$('printarea');
  const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
  const fileName='注文書_'+base+'.pdf';
- const style=document.createElement('style');
- style.textContent=`
-   #printarea.pdf-export{display:block!important;position:fixed!important;left:0!important;top:0!important;
-     z-index:2147483000!important;width:794px!important;min-height:1123px;box-sizing:border-box;
-     background:#fff!important;color:#000!important;padding:30px!important;
-     font-family:"Yu Gothic","Meiryo",sans-serif;font-size:12px;line-height:1.15}
-   #printarea.pdf-export h1{text-align:center;font-size:24px;border-bottom:2px solid #000;padding-bottom:6px;margin:0 0 12px}
-   #printarea.pdf-export .phead{display:flex;justify-content:space-between;margin:10px 0}
-   #printarea.pdf-export .pbox{border:1px solid #000;padding:7px;min-height:0;display:flex;align-items:center}
-   #printarea.pdf-export .p-recipient{display:inline-block;font-size:27px;line-height:1.1;margin-bottom:3px}
-   #printarea.pdf-export .pitems{width:100%;border-collapse:collapse;margin-top:10px}
-   #printarea.pdf-export .pitems th,#printarea.pdf-export .pitems td{border:1px solid #000;padding:4px 6px;font-size:11px;line-height:1.1}
-   #printarea.pdf-export .pitems th{background:#eee}
-   #printarea.pdf-export .pnote{border:1px solid #000;padding:7px;min-height:48px;margin-top:10px;white-space:pre-wrap}
-   #printarea.pdf-export .pissuer{display:flex;justify-content:flex-end;align-items:flex-end;gap:24px;margin-top:15px}
-   #printarea.pdf-export .pseal{width:220px;max-height:160px;object-fit:contain;object-position:center bottom}
- `;
- document.head.appendChild(style);
- area.classList.add('pdf-export');
+ // Capture a visible, self-contained clone. The original print area is intentionally hidden on screen.
+ const exportNode=source.cloneNode(true);
+ exportNode.removeAttribute('id');
+ exportNode.style.cssText='display:block!important;position:absolute!important;left:0!important;top:0!important;width:794px!important;min-height:1123px!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;padding:30px!important;font-family:"Yu Gothic","Meiryo",sans-serif;font-size:12px;line-height:1.25;';
+ exportNode.querySelectorAll('h1').forEach(el=>el.style.cssText='text-align:center;font-size:24px;border-bottom:2px solid #000;padding-bottom:8px;margin:0 0 16px;');
+ exportNode.querySelectorAll('.phead').forEach(el=>el.style.cssText='display:flex;justify-content:space-between;margin:10px 0;');
+ exportNode.querySelectorAll('.pbox').forEach(el=>el.style.cssText+='border:1px solid #000;padding:8px;display:flex;align-items:center;');
+ exportNode.querySelectorAll('.p-recipient').forEach(el=>el.style.cssText='display:inline-block;font-size:27px;line-height:1.2;margin-bottom:4px;');
+ exportNode.querySelectorAll('.pitems').forEach(el=>el.style.cssText='width:100%;border-collapse:collapse;margin-top:12px;');
+ exportNode.querySelectorAll('.pitems th,.pitems td').forEach(el=>el.style.cssText='border:1px solid #000;padding:6px;font-size:12px;line-height:1.2;');
+ exportNode.querySelectorAll('.pnote').forEach(el=>el.style.cssText='border:1px solid #000;padding:8px;min-height:55px;margin-top:12px;white-space:pre-wrap;');
+ exportNode.querySelectorAll('.pissuer').forEach(el=>el.style.cssText='display:flex;justify-content:flex-end;align-items:flex-end;margin-top:18px;');
+ exportNode.querySelectorAll('.pseal').forEach(el=>el.style.cssText='width:220px;max-height:160px;object-fit:contain;');
+ document.body.appendChild(exportNode);
  try{
-   // Let the browser finish layout and image decoding before html2canvas captures it.
    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-   const imgs=[...area.querySelectorAll('img')];
-   await Promise.all(imgs.map(img=>img.decode?img.decode().catch(()=>{}):Promise.resolve()));
-   await window.html2pdf().set({
+   await Promise.all([...exportNode.querySelectorAll('img')].map(img=>img.decode?img.decode().catch(()=>{}):Promise.resolve()));
+   const blob=await window.html2pdf().set({
      margin:[8,8,8,8],
-     filename:fileName,
      image:{type:'jpeg',quality:0.98},
-     html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,scrollX:0,scrollY:0},
+     html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,windowWidth:794},
      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
      pagebreak:{mode:['css','legacy']}
-   }).from(area).save();
-   // A canceled/failed PDF creation never reaches this point, so no history is added.
-   await saveOrderHistory(rows);
+   }).from(exportNode).outputPdf('blob');
+   if(!blob||blob.size<1000)throw new Error('PDFの内容が空でした。');
+   const pdfUrl=URL.createObjectURL(blob);
+   preview.document.open();
+   preview.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${fileName}</title><style>html,body{margin:0;height:100%;font-family:Arial,sans-serif}header{height:48px;display:flex;align-items:center;gap:16px;padding:0 16px;background:#263445;color:white}a{color:white}iframe{width:100%;height:calc(100% - 48px);border:0}</style></head><body><header><strong>注文書PDFプレビュー</strong><a href="${pdfUrl}" download="${fileName}" onclick="if(window.opener&&!window.opener.closed){window.opener.saveOrderHistory(window.opener.getOrderRows());}document.getElementById('downloadStatus').textContent='ダウンロードを開始しました。注文履歴に登録しています。';">このPDFをダウンロード</a><span id="downloadStatus" style="color:white;font-size:12px">プレビューを閉じると注文履歴には登録されません。</span></header><iframe src="${pdfUrl}"></iframe></body></html>`);
+   preview.document.close();
  }catch(err){
    console.error(err);
-   alert('PDFの作成に失敗しました。注文履歴には登録していません。\\n'+(err.message||''));
+   preview.document.body.innerHTML='<p style="font-family:sans-serif;padding:24px;color:#b00">PDFの作成に失敗しました。注文履歴には登録していません。<br>'+esc(err.message||'')+'</p>';
+   alert('PDFの作成に失敗しました。注文履歴には登録していません。\n'+(err.message||''));
  }finally{
-   area.classList.remove('pdf-export');
-   style.remove();
+   exportNode.remove();
  }
 }
 function getOrderRows(){
