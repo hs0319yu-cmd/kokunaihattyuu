@@ -35,6 +35,53 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 .supplierchip{padding:6px 10px;background:#eef4ff;border-radius:20px;font-size:12px}
 .notice{background:#fff8e7;border:1px solid #f0d48b;padding:12px;border-radius:9px;font-size:13px}
 @media(max-width:700px){body{padding:10px}.grid{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}}
+/* Smartphone専用レイアウト */
+@media(max-width:700px){
+ body{padding:0 0 92px;background:#eef2f7;font-size:15px}
+ .app{width:100%;max-width:none}
+ header{padding:16px 14px 10px;margin:0;gap:8px;align-items:center;flex-direction:row}
+ h1{font-size:20px;line-height:1.3}
+ header p{font-size:11px;line-height:1.4}
+ header .screen-actions button{padding:9px 11px;white-space:nowrap}
+ .notice{margin:8px 10px;padding:10px;font-size:12px;line-height:1.55}
+ .card{border-radius:12px;margin:10px;padding:14px;box-shadow:0 1px 5px #1527440a}
+ h2{font-size:16px;margin-bottom:12px}
+ .grid{grid-template-columns:1fr;gap:10px}
+ label{font-size:12px}
+ input,select,textarea{font-size:16px;min-height:44px;padding:10px 11px}
+ textarea{min-height:90px}
+ .row{flex-direction:column;align-items:stretch}
+ .actions{display:grid;grid-template-columns:1fr;gap:9px;margin-top:13px}
+ .actions button{width:100%;min-height:48px;font-size:16px}
+ .screen-actions.grid{display:grid;grid-template-columns:1fr 1fr}
+ .items{display:block;width:100%;border:0;margin-top:8px}
+ .items thead{display:none}
+ .items tbody{display:flex;flex-direction:column;gap:12px}
+ .items tbody tr{display:grid;grid-template-columns:minmax(0,1fr) 82px;gap:9px;background:#f8fafc;border:1px solid #d7e0ec;border-radius:11px;padding:11px}
+ .items tbody td{display:block;min-width:0!important;width:auto!important;border:0;padding:0;vertical-align:top}
+ .items tbody td:first-child{grid-column:1/-1}
+ .items tbody td:nth-child(2){grid-column:1;grid-row:2}
+ .items tbody td:nth-child(3){grid-column:2;grid-row:2}
+ .items tbody td:nth-child(4){grid-column:1/-1;grid-row:3;text-align:right}
+ .items .db-controls{min-width:0;width:100%}
+ .items .db-search,.items .iname,.items .qty{width:100%;min-width:0!important;font-size:16px;min-height:44px}
+ .items .db-help{font-size:10px;margin:4px 0 7px}
+ .items .qty{width:100%;text-align:center}
+ .items tbody td:nth-child(2)::before{content:'商品名・規格';display:block;font-size:11px;color:#667085;font-weight:700;margin:0 0 4px}
+ .items tbody td:nth-child(3)::before{content:'数量';display:block;font-size:11px;color:#667085;font-weight:700;margin:0 0 4px}
+ .items tbody td:nth-child(4) button{min-width:64px;min-height:38px}
+ .supplierlist{gap:6px}
+ .supplierchip{font-size:11px}
+ .history-order{padding:10px;margin:10px 0}
+ .history-table{font-size:12px}
+ .history-table th,.history-table td{padding:6px}
+ .status-select{font-size:14px;min-height:38px}
+ .mobile-actionbar{position:fixed;z-index:1000;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:9px 10px calc(9px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #d8dee8;box-shadow:0 -3px 14px #15274418}
+ .mobile-actionbar button{min-height:50px;font-size:16px;border-radius:10px}
+ .mobile-actionbar .primary{background:#1769d2}
+ .mobile-actionbar .green{background:#16835d}
+}
+@media(min-width:701px){.mobile-actionbar{display:none!important}}
 @media print{
  @page{size:A4 portrait;margin:8mm}
  body{background:white;padding:0;color:#000}.app header,.entry,.supplier-card,.notice,.screen-actions{display:none!important}
@@ -74,7 +121,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div class="app">
 <header><div><h1>国内仕入れ FAX注文書</h1><p>仕入れ先を登録して、注文書を作成・FAX送信できます</p></div>
 <div class="screen-actions"><button onclick="newOrder()">新規注文</button></div></header>
-<div class="notice">FAX送信：「送る！」を押し、印刷画面のプリンターで <b>「Kyocera TASKalfa 4054ci(J) NW-FAX」</b> を選択してください。次に京セラのFAX番号入力画面が開きます。</div>
+<div class="notice">FAX送信：「送る！」を押し、印刷画面のプリンターで <b>「Kyocera TASKalfa 4054ci(J) NW-FAX」</b> を選択してください。次に京セラのFAX番号入力画面が開きます。スマホは同じWi-Fiに接続して印刷できます。スマホからFAXを送る場合はKYOCERA Mobile Printアプリと複合機側のFAX機能設定が必要です。</div>
 
 <section class="card supplier-card">
 <h2>① 仕入れ先・FAX番号</h2>
@@ -111,6 +158,10 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 </div>
 <div class="actions screen-actions"><button class="green" onclick="downloadOrderPdf()">PDFで保存</button><button class="primary" onclick="sendFax()">送る！</button><button onclick="saveDraft()">注文内容を一時保存</button></div>
 </section>
+<div class="mobile-actionbar" aria-label="スマートフォン用操作">
+ <button class="green" type="button" onclick="downloadOrderPdf()">PDFで保存</button>
+ <button class="primary" type="button" onclick="sendFax()">送る！</button>
+</div>
 <section class="card history-card"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
 </div>
 <div class="printarea" id="printarea"></div>
@@ -328,34 +379,28 @@ function getOrderRows(){
    .filter(x=>x.name||x.qty||x.maker);
 }
 async function sendFax(){
- // FAX送信：印刷画面を閉じた後、ユーザーの完了確認が「はい」の場合だけ履歴登録する。
- // ブラウザーは印刷実行とキャンセルを区別できないため、完了確認で判定する。
+ // 「送る！」は印刷画面を開き、画面を閉じた時点で履歴を自動登録する。
+ // ブラウザーの仕様上、印刷実行とキャンセルは区別できないため、不要な履歴は履歴一覧から削除してください。
  $('sendMethod').value='device';
  if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){
    alert('仕入れ先名とFAX番号を入力してください。');return;
  }
  const rows=getOrderRows();
  if(!rows.length){alert('商品名または数量を1件以上入力してください。');return;}
- // 印刷物に注文番号を必ず表示する。ここでは履歴登録しない。
  if(!$('orderNo').value.trim())$('orderNo').value=createOrderNumber();
  if(!await buildPrintDocument())return;
  const oldTitle=document.title;
  const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
  document.title='注文書_'+base;
- setSharedStatus('印刷画面で複合機「Kyocera TASKalfa 4054ci(J) NW-FAX」を選択してください。印刷画面を閉じた後、FAX送信完了を確認します。');
+ setSharedStatus('印刷画面で複合機を選択してください。印刷画面を閉じると注文履歴を自動登録します。');
  try{
    window.print();
  }finally{
    document.title=oldTitle;
  }
- // 印刷画面でキャンセルした場合は「いいえ」を選択すれば履歴は残らない。
- const completed=confirm('FAX送信を完了しましたか？\n\n「OK」：注文履歴に登録する\n「キャンセル」：履歴に登録しない');
- if(!completed){
-   setSharedStatus('FAX送信は未完了として扱いました。注文履歴には登録していません。');
-   return;
- }
+ // 印刷ダイアログ終了後に登録。キャンセル時も登録されるため、不要なら履歴から削除。
  if(!await saveOrderHistory(rows))return;
- setSharedStatus('FAX送信完了を確認し、注文履歴を共有登録しました。');
+ setSharedStatus('印刷画面を終了しました。注文履歴を自動登録しました。FAX送信の成否は複合機側で確認してください。');
 }
 async function buildPrintDocument(){
  if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){
