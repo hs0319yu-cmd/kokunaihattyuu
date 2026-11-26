@@ -84,19 +84,23 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 @media(min-width:701px){.mobile-actionbar{display:none!important}}
 @media print{
  @page{size:A4 portrait;margin:8mm}
- body{background:white;padding:0;color:#000}
+ html,body{width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:hidden!important;background:#fff!important;color:#000!important}
+ /* visibility:hidden だけだと画面全体のレイアウト領域が印刷に残り、空白ページが発生する。
+    印刷時は発注書以外の要素を display:none にして、発注書だけを通常フローで印刷する。 */
+ body > :not(#printarea){display:none!important}
  body *{visibility:hidden!important}
- .printarea,.printarea *{visibility:visible!important}
- .printarea{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important;padding:0!important;font-family:"Yu Gothic","Meiryo",sans-serif;font-size:9pt;line-height:1.15}
- .printarea h1{text-align:center;font-size:18pt;border-bottom:1.5px solid #000;padding-bottom:4px;margin:0 0 8px}
- .phead{display:flex;justify-content:space-between;margin:8px 0}
- .pbox{border:0;padding:5px 0;min-height:0;display:flex;align-items:center}
- .p-recipient{display:inline-block;font-size:20pt;line-height:1.1;margin-bottom:2px}
- .pitems{width:100%;border-collapse:collapse;margin-top:8px}
- .pitems th,.pitems td{border:1px solid #000;padding:3px 5px;font-size:8.5pt;line-height:1.1}.pitems th:first-child,.pitems td:first-child{font-size:11pt}.pitems th:last-child,.pitems td:last-child{width:42px;white-space:nowrap;padding-left:3px;padding-right:3px}
- .pitems th{background:#eee!important;print-color-adjust:exact}
- .pnote{border:1px solid #000;padding:5px;min-height:38px;margin-top:8px;white-space:pre-wrap}
- .tot{text-align:right;font-size:11pt;margin-top:8px}
+ #printarea,#printarea *{visibility:visible!important}
+ #printarea{display:block!important;position:relative!important;left:auto!important;top:auto!important;width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;font-family:"Yu Gothic","Meiryo",sans-serif;font-size:9pt;line-height:1.15;break-after:avoid!important;page-break-after:avoid!important}
+ #printarea h1{text-align:center;font-size:18pt;border-bottom:1.5px solid #000;padding-bottom:4px;margin:0 0 8px}
+ #printarea .phead{display:flex;justify-content:space-between;margin:8px 0}
+ #printarea .pbox{border:0;padding:5px 0;min-height:0;display:flex;align-items:center}
+ #printarea .p-recipient{display:inline-block;font-size:20pt;line-height:1.1;margin-bottom:2px}
+ #printarea .pitems{width:100%;border-collapse:collapse;margin-top:8px}
+ #printarea .pitems th,#printarea .pitems td{border:1px solid #000;padding:3px 5px;font-size:8.5pt;line-height:1.1}#printarea .pitems th:first-child,#printarea .pitems td:first-child{font-size:11pt}#printarea .pitems th:last-child,#printarea .pitems td:last-child{width:42px;white-space:nowrap;padding-left:3px;padding-right:3px}
+ #printarea .pitems th{background:#eee!important;print-color-adjust:exact}
+ #printarea .pnote{border:1px solid #000;padding:5px;min-height:38px;margin-top:8px;white-space:pre-wrap}
+ #printarea .tot{text-align:right;font-size:11pt;margin-top:8px}
+ #printarea .pissuer{break-inside:avoid!important;page-break-inside:avoid!important}
 }
 .printarea{display:none}
 .history-order{border:1px solid #d8dee8;border-radius:9px;padding:12px;margin:12px 0}
