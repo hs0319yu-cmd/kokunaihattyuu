@@ -282,7 +282,7 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function newOrder(){if(confirm('注文内容をクリアして新規注文にしますか？')){ $('orderNo').value='';$('subject').value='';$('notes').value='';$('itemRows').innerHTML='';addItem();$('orderDate').value=new Date().toISOString().slice(0,10)}}
 function saveDraft(){let data={date:$('orderDate').value,no:$('orderNo').value,sender:$('sender').value,subject:$('subject').value,notes:$('notes').value,supplier:$('supplierName').value,fax:$('supplierFax').value,address:$('supplierAddress').value,items:[...document.querySelectorAll('#itemRows tr')].map(r=>[r.querySelector('.iname').value,r.querySelector('.qty').value])};localStorage.setItem('faxorder_draft',JSON.stringify(data));alert('このブラウザーに注文内容を一時保存しました。')}
 async function saveOrderHistory(rows){
- const now=new Date(),no=$('orderNo').value.trim()||('AUTO-'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'-'+now.getTime().toString().slice(-6)+'-'+Math.random().toString(36).slice(2,6));
+ const now=new Date(),no=$('orderNo').value.trim()||createOrderNumber();
  const record={id:no,date:$('orderDate').value||now.toISOString().slice(0,10),createdAt:now.toISOString(),operator:$('sender').value.trim(),supplier:$('supplierName').value.trim(),fax:$('supplierFax').value.trim(),items:rows.map((x,i)=>({id:no+'-'+i,maker:x.maker||'',name:x.name,qty:x.qty,received:false})),notes:$('notes').value};
  // 同じ注文番号がある場合は確認を挟まず最新内容で更新する。
  setSharedStatus('注文履歴を共有保存しています…');
@@ -299,8 +299,12 @@ function loadSeal(){sealData=localStorage.getItem('faxorder_seal')||'';$('sealPr
 function clearSeal(){if(!confirm('登録した社判画像を削除しますか？'))return;localStorage.removeItem('faxorder_seal');sealData='';$('sealFile').value='';loadSeal();}
 $('sealFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;if(!f.type.startsWith('image/')){alert('画像ファイルを選択してください。');return;}const r=new FileReader();r.onload=()=>{sealData=r.result;try{localStorage.setItem('faxorder_seal',sealData);loadSeal();alert('社判画像を登録しました。');}catch(err){alert('画像サイズが大きすぎます。小さいPNG/JPG画像を使用してください。');}};r.readAsDataURL(f);});
 // PDF保存：ブラウザー標準の印刷画面を開き、保存先で「PDFに保存」を選択する。履歴は登録しない。
+function createOrderNumber(){const now=new Date();return 'AUTO-'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'-'+now.getTime().toString().slice(-6)+'-'+Math.random().toString(36).slice(2,6).toUpperCase();}
+
 async function downloadOrderPdf(){
  $('outputFormat').value='pdf';
+ // PDFには注文番号を印字するが、PDF保存だけでは履歴を登録しない。
+ if(!$('orderNo').value.trim())$('orderNo').value=createOrderNumber();
  if(!await buildPrintDocument())return;
  const oldTitle=document.title;
  const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
@@ -308,7 +312,7 @@ async function downloadOrderPdf(){
  setSharedStatus('印刷画面で保存先に「PDFに保存」を選択してください。PDF保存では注文履歴に登録しません。');
  try{window.print();}
  finally{document.title=oldTitle;}
- setSharedStatus('PDF保存画面を終了しました。注文履歴には登録していません。');
+ setSharedStatus('PDF保存画面を終了しました。PDF保存では注文履歴に登録していません。');
 }
 
 function getOrderRows(){
@@ -324,20 +328,34 @@ function getOrderRows(){
    .filter(x=>x.name||x.qty||x.maker);
 }
 async function sendFax(){
- // Kyocera NW-FAX はPCに登録されたFAXプリンタードライバーを使用する。
+ // FAX送信：印刷画面を閉じた後、ユーザーの完了確認が「はい」の場合だけ履歴登録する。
+ // ブラウザーは印刷実行とキャンセルを区別できないため、完了確認で判定する。
  $('sendMethod').value='device';
+ if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){
+   alert('仕入れ先名とFAX番号を入力してください。');return;
+ }
+ const rows=getOrderRows();
+ if(!rows.length){alert('商品名または数量を1件以上入力してください。');return;}
+ // 印刷物に注文番号を必ず表示する。ここでは履歴登録しない。
+ if(!$('orderNo').value.trim())$('orderNo').value=createOrderNumber();
  if(!await buildPrintDocument())return;
  const oldTitle=document.title;
  const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
  document.title='注文書_'+base;
+ setSharedStatus('印刷画面で複合機「Kyocera TASKalfa 4054ci(J) NW-FAX」を選択してください。印刷画面を閉じた後、FAX送信完了を確認します。');
  try{
    window.print();
  }finally{
    document.title=oldTitle;
  }
- // PDF保存時だけ注文履歴へ登録する。FAX画面を閉じても履歴は作成しない。
- // ブラウザーの印刷画面は送信とキャンセルを判別できないため、確認ダイアログも表示しない。
- setSharedStatus('FAX画面を終了しました。注文履歴への登録はPDF保存時のみ行います。');
+ // 印刷画面でキャンセルした場合は「いいえ」を選択すれば履歴は残らない。
+ const completed=confirm('FAX送信を完了しましたか？\n\n「OK」：注文履歴に登録する\n「キャンセル」：履歴に登録しない');
+ if(!completed){
+   setSharedStatus('FAX送信は未完了として扱いました。注文履歴には登録していません。');
+   return;
+ }
+ if(!await saveOrderHistory(rows))return;
+ setSharedStatus('FAX送信完了を確認し、注文履歴を共有登録しました。');
 }
 async function buildPrintDocument(){
  if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){
