@@ -84,18 +84,21 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 @media(min-width:701px){.mobile-actionbar{display:none!important}}
 @media print{
  @page{size:A4 portrait;margin:8mm}
- html,body{width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:hidden!important;background:#fff!important;color:#000!important}
+ html,body{width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important;color:#000!important}
  /* visibility:hidden だけだと画面全体のレイアウト領域が印刷に残り、空白ページが発生する。
     印刷時は発注書以外の要素を display:none にして、発注書だけを通常フローで印刷する。 */
  body > :not(#printarea){display:none!important}
  body *{visibility:hidden!important}
  #printarea,#printarea *{visibility:visible!important}
- #printarea{display:block!important;position:relative!important;left:auto!important;top:auto!important;width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;font-family:"Yu Gothic","Meiryo",sans-serif;font-size:9pt;line-height:1.15;break-after:avoid!important;page-break-after:avoid!important}
+ #printarea{display:block!important;position:relative!important;left:auto!important;top:auto!important;width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;break-after:auto!important;page-break-after:auto!important;font-family:"Yu Gothic","Meiryo",sans-serif;font-size:9pt;line-height:1.15}
  #printarea h1{text-align:center;font-size:18pt;border-bottom:1.5px solid #000;padding-bottom:4px;margin:0 0 8px}
  #printarea .phead{display:flex;justify-content:space-between;margin:8px 0}
  #printarea .pbox{border:0;padding:5px 0;min-height:0;display:flex;align-items:center}
  #printarea .p-recipient{display:inline-block;font-size:20pt;line-height:1.1;margin-bottom:2px}
- #printarea .pitems{width:100%;border-collapse:collapse;margin-top:8px}
+ #printarea .pitems{width:100%;border-collapse:collapse;margin-top:8px;page-break-inside:auto;break-inside:auto}
+ #printarea .pitems thead{display:table-header-group}
+ #printarea .pitems tr{break-inside:avoid!important;page-break-inside:avoid!important}
+ #printarea .pnote{break-inside:avoid!important;page-break-inside:avoid!important}
  #printarea .pitems th,#printarea .pitems td{border:1px solid #000;padding:3px 5px;font-size:8.5pt;line-height:1.1}#printarea .pitems th:first-child,#printarea .pitems td:first-child{font-size:11pt}#printarea .pitems th:last-child,#printarea .pitems td:last-child{width:42px;white-space:nowrap;padding-left:3px;padding-right:3px}
  #printarea .pitems th{background:#eee!important;print-color-adjust:exact}
  #printarea .pnote{border:1px solid #000;padding:5px;min-height:38px;margin-top:8px;white-space:pre-wrap}
@@ -114,7 +117,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 .history-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
 .history-table th,.history-table td{border:1px solid #d8dee8;padding:8px;text-align:left}
 .history-table th{background:#f2f5f9}.status-select{max-width:130px;padding:6px}
-@media print{.pissuer{display:flex;justify-content:flex-end;align-items:flex-end;margin-top:14px;break-inside:avoid}.psign{text-align:right;line-height:1.45;font-size:9pt}.psign .company{font-size:12pt;font-weight:700;color:#a00000;border:2px solid #a00000;display:inline-block;padding:5px 9px;margin-bottom:5px;letter-spacing:.08em}.psign strong{font-size:10pt}}
+@media print{.pissuer{display:flex;justify-content:flex-end;align-items:flex-end;margin-top:14px;break-inside:avoid!important;page-break-inside:avoid!important}.psign{text-align:right;line-height:1.45;font-size:9pt}.psign .company{font-size:12pt;font-weight:700;color:#a00000;border:2px solid #a00000;display:inline-block;padding:5px 9px;margin-bottom:5px;letter-spacing:.08em}.psign strong{font-size:10pt}}
 
 #pdfPreviewModal{display:none;position:fixed;inset:0;background:#0009;z-index:9999;padding:3vh 3vw}
 #pdfPreviewModal .pdf-panel{background:#fff;width:min(100%,1000px);height:94vh;margin:auto;border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
@@ -436,13 +439,16 @@ async function sendFax(){
      .fax-pdf-page .phead{display:flex;justify-content:space-between;gap:18px;margin:12px 0}
      .fax-pdf-page .pbox{width:58%;padding:6px 0;min-height:55px;display:flex;align-items:center}
      .fax-pdf-page .p-recipient{display:inline-block;font-size:27px;line-height:1.15;margin-bottom:3px}
-     .fax-pdf-page .pitems{width:100%;border-collapse:collapse;margin-top:12px}
+     .fax-pdf-page .pitems{width:100%;border-collapse:collapse;margin-top:12px;page-break-inside:auto;break-inside:auto}
+     .fax-pdf-page .pitems thead{display:table-header-group}
+     .fax-pdf-page .pitems tr{break-inside:avoid!important;page-break-inside:avoid!important}
+     .fax-pdf-page .pnote{break-inside:avoid!important;page-break-inside:avoid!important}
      .fax-pdf-page .pitems th,.fax-pdf-page .pitems td{border:1px solid #222;padding:7px 8px;font-size:12px;line-height:1.3}
      .fax-pdf-page .pitems th:first-child,.fax-pdf-page .pitems td:first-child{font-size:14px}
      .fax-pdf-page .pitems th:last-child,.fax-pdf-page .pitems td:last-child{width:55px;white-space:nowrap;text-align:right}
      .fax-pdf-page .pitems th{background:#eee}
      .fax-pdf-page .pnote{border:1px solid #222;padding:8px;min-height:52px;margin-top:12px;white-space:pre-wrap}
-     .fax-pdf-page .pissuer{display:flex;justify-content:flex-end;align-items:flex-end;margin-top:14px;break-inside:avoid}
+     .fax-pdf-page .pissuer{display:flex;justify-content:flex-end;align-items:flex-end;margin-top:14px;break-inside:avoid!important;page-break-inside:avoid!important}
      .fax-pdf-page .psign{text-align:right;line-height:1.45;font-size:11px}
      .fax-pdf-page .psign .company{font-size:16px;font-weight:700;color:#a00000;border:2px solid #a00000;display:inline-block;padding:5px 9px;margin-bottom:5px;letter-spacing:.08em}
      .fax-pdf-page .psign strong{font-size:13px}
@@ -456,11 +462,10 @@ async function sendFax(){
        image:{type:'jpeg',quality:0.98},
        html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,scrollX:0,scrollY:0},
        jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-       // 発注書は1枚構成。CSS/legacyの改ページ判定による白紙ページを作らない。
-       pagebreak:{mode:[]}
+       // 商品数に応じて自動改ページ。行・備考・社判は途中で分割しない。
+       pagebreak:{mode:['css','legacy'],avoid:['tr','.phead','.pnote','.pissuer']}
      }).from(render.querySelector('.fax-pdf-page')).toPdf().get('pdf');
-     // 1ページ帳票のため、ライブラリの端数計算で追加された余分なページを除去する。
-     while(pdf.getNumberOfPages()>1) pdf.deletePage(pdf.getNumberOfPages());
+     // 複数ページを保持する。商品行を削除せず、必要なページ数をそのまま出力する。
      const blob=pdf.output('blob');
      const file=new File([blob],filename,{type:'application/pdf'});
      pendingFax={file,rows:JSON.parse(JSON.stringify(rows)),filename};
