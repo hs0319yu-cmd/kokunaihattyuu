@@ -34,6 +34,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 .supplierlist{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .supplierchip{padding:6px 10px;background:#eef4ff;border-radius:20px;font-size:12px}
 .notice{background:#fff8e7;border:1px solid #f0d48b;padding:12px;border-radius:9px;font-size:13px}
+.mobile-history-top{display:none}
 @media(max-width:700px){body{padding:10px}.grid{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}}
 /* Smartphone専用レイアウト */
 @media(max-width:700px){
@@ -43,6 +44,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
  h1{font-size:20px;line-height:1.3}
  header p{font-size:11px;line-height:1.4}
  header .screen-actions button{padding:9px 11px;white-space:nowrap}
+ .mobile-history-top{display:none}
  .notice{margin:8px 10px;padding:10px;font-size:12px;line-height:1.55}
  .card{border-radius:12px;margin:10px;padding:14px;box-shadow:0 1px 5px #1527440a}
  h2{font-size:16px;margin-bottom:12px}
@@ -78,6 +80,10 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
  .status-select{font-size:14px;min-height:38px}
  .items .db-controls select{display:block;width:100%;min-width:0;min-height:46px;margin:7px 0;padding:10px 12px;font-size:16px;line-height:1.35;position:relative;z-index:2;pointer-events:auto;touch-action:manipulation;-webkit-appearance:menulist;appearance:auto;background-color:#fff;color:#243047;border:1px solid #94a3b8;border-radius:8px}
  .items .db-controls select:disabled{opacity:.65;background:#eef2f7;color:#667085}
+ .items .db-controls select:not(:disabled){border:2px solid #3977c9;border-radius:10px;background:#f7fbff;font-weight:700;color:#173b68;min-height:54px;padding:12px 38px 12px 13px;margin:8px 0;font-size:16px;box-shadow:0 1px 3px #15274412}
+ .items .db-controls select:focus,#supplierSelect:focus{outline:3px solid #bfdbfe;border-color:#1769d2}
+ .mobile-history-top{display:block;width:100%;margin:10px 0 0;padding:12px 14px;min-height:48px;background:#16835d;color:#fff;border-radius:10px;font-size:15px}
+ .history-card{scroll-margin-top:12px}
  #supplierSelect{min-height:46px;font-size:16px;touch-action:manipulation;-webkit-appearance:menulist;appearance:auto}
  .actions.screen-actions{display:none!important}
  .mobile-actionbar{position:fixed;z-index:1000;left:0;right:0;bottom:0;display:block;padding:9px 12px calc(9px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #d8dee8;box-shadow:0 -3px 14px #15274418}
@@ -132,6 +138,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div class="app">
 <header><div><h1>国内仕入れ FAX注文書</h1><p>仕入れ先を登録して、注文書を作成・印刷できます</p></div>
 <div class="screen-actions"><button onclick="newOrder()">新規注文</button></div></header>
+<button class="mobile-history-top" type="button" onclick="openOrderHistory()">📋 注文履歴・入荷管理を開く</button>
 <div class="notice">注文書を作成して印刷し、印刷した用紙をこれまでどおりFAXしてください。印刷画面を閉じた後、注文履歴に登録するかどうかを選べます。入荷管理は下の「注文履歴・入荷管理」から今までどおり操作できます。</div>
 
 <section class="card supplier-card">
@@ -168,7 +175,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div class="mobile-actionbar" aria-label="スマートフォン用操作">
  <button class="print-action" type="button" onclick="printOrderAndAskHistory()">PDFを印刷</button>
 </div>
-<section class="card history-card"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
+<section class="card history-card" id="historySection"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
 </div>
 
 <div class="printarea" id="printarea"></div>
@@ -346,6 +353,15 @@ async function saveOrderHistory(rows){
  setSharedStatus('注文履歴を共有保存しています…');
  try{const saved=await apiCall('saveOrder',{record});const ix=orders.findIndex(o=>o.id===saved.id);if(ix>=0)orders[ix]=saved;else orders.unshift(saved);$('orderNo').value=no;renderHistory();setSharedStatus('注文履歴を全員に共有しました');return true;}catch(e){setSharedStatus('注文履歴の保存に失敗しました');alert('共有保存に失敗しました。印刷前に通信状態を確認してください。\n'+e.message);return false;}
 }
+function openOrderHistory(){
+ const section=$('historySection');
+ if(!section)return;
+ section.style.display='block';
+ renderHistory();
+ section.scrollIntoView({behavior:'smooth',block:'start'});
+ const search=$('historySearch');
+ if(search){setTimeout(()=>search.focus({preventScroll:true}),350)}
+}
 function renderHistory(){
  const q=($('historySearch')?.value||'').trim().toLowerCase(),f=$('historyFilter')?.value||'all';
  const list=orders.filter(o=>{const hay=[o.id,o.date,o.operator,o.supplier,...o.items.map(i=>i.name)].join(' ').toLowerCase(),done=o.items.length>0&&o.items.every(i=>i.received);return(!q||hay.includes(q))&&(f==='all'||(f==='pending'&&!done)||(f==='received'&&done));});
@@ -458,6 +474,13 @@ async function printOrderAndAskHistory(){
 
    // iPhone等で非同期処理後の新規タブがブロックされないよう、タップ直後に開く。
    const previewWindow=window.open('about:blank','_blank');
+   if(previewWindow){
+     try{
+       previewWindow.document.open();
+       previewWindow.document.write('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>注文書PDFを準備中</title><style>html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f3f6fa}#wait{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#243047;font-weight:700;padding:24px;box-sizing:border-box}</style></head><body><div id="wait">注文書PDFを作成しています…<br>この画面のままお待ちください</div></body></html>');
+       previewWindow.document.close();
+     }catch(_e){}
+   }
    const overlay=document.createElement('div');
    overlay.style.cssText='position:fixed;inset:0;z-index:20002;background:rgba(255,255,255,.96);display:flex;align-items:center;justify-content:center;font: bold 16px sans-serif;color:#243047;';
    overlay.textContent='注文書PDFを作成しています…';
@@ -483,9 +506,14 @@ async function printOrderAndAskHistory(){
      const blobUrl=URL.createObjectURL(blob);
 
      if(previewWindow&&!previewWindow.closed){
-       previewWindow.location.href=blobUrl;
-       // PDFタブが読み込み終わる前にURLを破棄しない。
-       setTimeout(()=>URL.revokeObjectURL(blobUrl),120000);
+       // SafariでPDF直リンクの新規タブが白紙のままになる現象を避け、
+       // HTMLビューアー内のiframeへPDFを設定して読み込み完了を待つ。
+       try{
+         previewWindow.document.open();
+         previewWindow.document.write('<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+filename+'</title><style>html,body{margin:0;width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#eef2f7}#bar{height:48px;display:flex;align-items:center;justify-content:center;background:#fff;color:#243047;font-size:14px;font-weight:700}#pdf{display:block;width:100%;height:calc(100% - 48px);border:0;background:#fff}#fallback{padding:12px;text-align:center;font-size:14px}a{color:#1769d2}</style></head><body><div id="bar">注文書プレビュー</div><iframe id="pdf" title="注文書PDF"></iframe><div id="fallback">表示に時間がかかる場合は <a id="openPdf" target="_blank">PDFを別画面で開く</a></div><script>document.getElementById("pdf").src='+JSON.stringify(blobUrl)+';document.getElementById("openPdf").href='+JSON.stringify(blobUrl)+';<\/script></body></html>');
+         previewWindow.document.close();
+       }catch(viewError){previewWindow.location.href=blobUrl;}
+       setTimeout(()=>URL.revokeObjectURL(blobUrl),180000);
        setSharedStatus('注文書PDFを開きました。プレビューから印刷できます。');
      }else{
        // ポップアップを許可していない場合はPDFファイルとして保存できるようにする。
