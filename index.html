@@ -617,6 +617,27 @@ function addUsualItemToOrder(index){
 }
 
 
+// 数量入力後にEnterで「いつもの発注リスト」を再表示し、連続入力できるようにする。
+// 商品カード選択後は addUsualItemToOrder() が数量欄へフォーカスするため、
+// Enter → リスト → 商品選択 → 数量入力 の流れを繰り返せる。
+$('itemRows').addEventListener('keydown',function(e){
+ const qty=e.target;
+ if(!qty.classList || !qty.classList.contains('qty')) return;
+ if(e.key==='Enter'){
+  e.preventDefault();
+  e.stopPropagation();
+  openUsualOrderList();
+  const search=$('usualSearch');
+  if(search){
+   search.value='';
+   renderUsualList();
+   // 商品一覧を開いた直後に検索欄へ移動し、続けて絞り込みもできる
+   setTimeout(()=>search.focus({preventScroll:true}),50);
+  }
+ }
+});
+
+
 function getOrderRows(){
  return [...document.querySelectorAll('#itemRows tr')]
    .map(r=>{
