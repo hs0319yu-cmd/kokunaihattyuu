@@ -74,7 +74,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div class="app">
 <header><div><h1>国内仕入れ FAX注文書</h1><p>仕入れ先を登録して、注文書を作成・FAX送信できます</p></div>
 <div class="screen-actions"><button onclick="newOrder()">新規注文</button></div></header>
-<div class="notice">FAX送信：「FAX送る」を押し、印刷画面のプリンターで <b>「Kyocera TASKalfa 4054ci(J) NW-FAX」</b> を選択してください。次に京セラのFAX番号入力画面が開きます。</div>
+<div class="notice">FAX送信：「送る！」を押し、印刷画面のプリンターで <b>「Kyocera TASKalfa 4054ci(J) NW-FAX」</b> を選択してください。次に京セラのFAX番号入力画面が開きます。</div>
 
 <section class="card supplier-card">
 <h2>① 仕入れ先・FAX番号</h2>
@@ -109,15 +109,11 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div><label for="outputFormat">出力形式</label><select id="outputFormat"><option value="pdf" selected>PDF</option></select></div>
 <div><label for="sendMethod">送信方法</label><select id="sendMethod"><option value="device">複合機FAX</option><option value="network">ネットFAX</option></select></div>
 </div>
-<div class="actions screen-actions"><button class="green" onclick="downloadOrderPdf()">PDFダウンロード</button><button class="primary" onclick="sendFax()">FAX送る</button><button onclick="saveDraft()">注文内容を一時保存</button></div>
+<div class="actions screen-actions"><button class="green" onclick="downloadOrderPdf()">PDFで保存</button><button class="primary" onclick="sendFax()">送る！</button><button onclick="saveDraft()">注文内容を一時保存</button></div>
 </section>
 <section class="card history-card"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
 </div>
 <div class="printarea" id="printarea"></div>
-<div id="pdfPreviewModal" role="dialog" aria-modal="true">
- <div class="pdf-panel"><div class="pdf-toolbar"><b style="flex:1">注文書 PDF プレビュー</b><button class="green" onclick="confirmPdfDownload()">PDFをダウンロード（履歴登録なし）</button><button onclick="closePdfPreview()">閉じる（登録しない）</button></div><iframe id="pdfPreviewFrame" title="注文書PDFプレビュー"></iframe></div>
-</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="./config.js"></script>
 <script>
 const $=id=>document.getElementById(id);
@@ -302,36 +298,17 @@ async function deleteOrder(id){if(!confirm('この注文履歴を全員の共有
 function loadSeal(){sealData=localStorage.getItem('faxorder_seal')||'';$('sealPreview').innerHTML=sealData?'<img class="seal-preview" alt="登録済み社判" src="'+sealData+'">':'<span class="small">社判は未登録です。</span>';}
 function clearSeal(){if(!confirm('登録した社判画像を削除しますか？'))return;localStorage.removeItem('faxorder_seal');sealData='';$('sealFile').value='';loadSeal();}
 $('sealFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;if(!f.type.startsWith('image/')){alert('画像ファイルを選択してください。');return;}const r=new FileReader();r.onload=()=>{sealData=r.result;try{localStorage.setItem('faxorder_seal',sealData);loadSeal();alert('社判画像を登録しました。');}catch(err){alert('画像サイズが大きすぎます。小さいPNG/JPG画像を使用してください。');}};r.readAsDataURL(f);});
-let pendingPdfBlob=null,pendingPdfUrl=null;
+// PDF保存：ブラウザー標準の印刷画面を開き、保存先で「PDFに保存」を選択する。履歴は登録しない。
 async function downloadOrderPdf(){
  $('outputFormat').value='pdf';
  if(!await buildPrintDocument())return;
- if(typeof html2pdf==='undefined'){alert('PDF作成ライブラリを読み込めませんでした。インターネット接続を確認してください。');return;}
- const source=$('printarea'),oldStyle=source.getAttribute('style');
- try{
-  // html2canvas が要素を確実に描画できるよう、キャプチャ中だけ画面最前面に配置する。
-  // z-index:-1 だと body 背景の後ろに隠れて白紙PDFになるため使用しない。
-  source.style.display='block';source.style.position='fixed';source.style.left='0';source.style.top='0';source.style.width='794px';source.style.zIndex='9998';source.style.background='#fff';source.style.color='#000';source.style.padding='0';source.style.margin='0';source.style.pointerEvents='none';
-  await Promise.all([...source.querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve})));
-  const opt={margin:8,filename:'注文書.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}};
-  pendingPdfBlob=await html2pdf().set(opt).from(source).outputPdf('blob');
-  if(!pendingPdfBlob||pendingPdfBlob.size<1000)throw new Error('PDFの内容が空です。注文内容を確認して再度お試しください。');
-  // PDF生成後に最低限のサイズを検査し、白紙・空データをプレビューに渡さない。
-  if(pendingPdfUrl)URL.revokeObjectURL(pendingPdfUrl);
-  pendingPdfUrl=URL.createObjectURL(pendingPdfBlob);
-  $('pdfPreviewFrame').src=pendingPdfUrl;$('pdfPreviewModal').style.display='block';
-  setSharedStatus('PDFプレビューを表示しています。ダウンロードしても注文履歴には登録されません。');
- }catch(e){console.error(e);alert('PDFを作成できませんでした。'+(e.message||''));}
- finally{if(oldStyle===null)source.removeAttribute('style');else source.setAttribute('style',oldStyle);}
-}
-function closePdfPreview(){ $('pdfPreviewModal').style.display='none';$('pdfPreviewFrame').src='about:blank';pendingPdfBlob=null;if(pendingPdfUrl){URL.revokeObjectURL(pendingPdfUrl);pendingPdfUrl=null;}setSharedStatus('PDFプレビューを閉じました。注文履歴には登録していません。'); }
-async function confirmPdfDownload(){
- if(!pendingPdfBlob||!pendingPdfUrl)return;
- if(!confirm('PDFをダウンロードします。\n注文履歴には登録されません。\nよろしいですか？'))return;
+ const oldTitle=document.title;
  const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
- const a=document.createElement('a');a.href=pendingPdfUrl;a.download='注文書_'+base+'.pdf';document.body.appendChild(a);a.click();a.remove();
- closePdfPreview();
- setSharedStatus('PDFをダウンロードしました。注文履歴には登録していません。');
+ document.title='注文書_'+base;
+ setSharedStatus('印刷画面で保存先に「PDFに保存」を選択してください。PDF保存では注文履歴に登録しません。');
+ try{window.print();}
+ finally{document.title=oldTitle;}
+ setSharedStatus('PDF保存画面を終了しました。注文履歴には登録していません。');
 }
 
 function getOrderRows(){
