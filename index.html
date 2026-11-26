@@ -52,6 +52,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
  textarea{min-height:90px}
  .row{flex-direction:column;align-items:stretch}
  .actions{display:grid;grid-template-columns:1fr;gap:9px;margin-top:13px}
+ .actions.screen-actions .green{display:none}
  .actions button{width:100%;min-height:48px;font-size:16px}
  .screen-actions.grid{display:grid;grid-template-columns:1fr 1fr}
  .items{display:block;width:100%;border:0;margin-top:8px}
@@ -76,7 +77,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
  .history-table{font-size:12px}
  .history-table th,.history-table td{padding:6px}
  .status-select{font-size:14px;min-height:38px}
- .mobile-actionbar{position:fixed;z-index:1000;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:9px 10px calc(9px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #d8dee8;box-shadow:0 -3px 14px #15274418}
+ .mobile-actionbar{position:fixed;z-index:1000;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr;gap:8px;padding:9px 10px calc(9px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #d8dee8;box-shadow:0 -3px 14px #15274418}
  .mobile-actionbar button{min-height:50px;font-size:16px;border-radius:10px}
  .mobile-actionbar .primary{background:#1769d2}
  .mobile-actionbar .green{background:#16835d}
@@ -127,9 +128,9 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 </head>
 <body>
 <div class="app">
-<header><div><h1>国内仕入れ FAX注文書</h1><p>仕入れ先を登録して、注文書を作成・FAX送信できます</p></div>
+<header><div><h1>国内仕入れ FAX注文書</h1><p>仕入れ先を登録して、注文書を作成・印刷できます</p></div>
 <div class="screen-actions"><button onclick="newOrder()">新規注文</button></div></header>
-<div class="notice">iPhoneでFAX送信：「FAX送信」を押して発注書PDFを作成し、共有シートから <b>KYOCERA Print（Copy to KYOCERA Print）</b> を選択してPDFを取り込みます。FAX送信操作が利用できる場合は京セラ側で送信し、完了後に注文アプリへ戻り、「FAX送信完了・注文履歴に登録」を押してください。PDFを共有しただけでは履歴登録されません。</div>
+<div class="notice">注文書を作成して印刷し、印刷した用紙をこれまでどおりFAXしてください。印刷画面を閉じた後、注文履歴に登録するかどうかを選べます。入荷管理は下の「注文履歴・入荷管理」から今までどおり操作できます。</div>
 
 <section class="card supplier-card">
 <h2>① 仕入れ先・FAX番号</h2>
@@ -160,30 +161,12 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div class="actions"><button onclick="addItem()">＋ 商品行を追加</button></div>
 <div style="margin-top:15px"><label>備考</label><textarea id="notes" placeholder="納期・配送先・その他"></textarea></div>
 <div class="grid" style="margin-top:14px"><div><label>発行元・社判表示</label><div style="padding:12px;border:1px solid #d8dee8;border-radius:8px;background:#f8fafc;line-height:1.7"><b style="color:#a00000;border:2px solid #a00000;padding:3px 7px;display:inline-block">株式会社 竹山商事</b><br>代表取締役 陳 金錬<br>〒861-8035 熊本県熊本市東区御領6丁目3-1<br>TEL：(096)389-5273　FAX：(096)389-5292</div><p class="small">発行元情報は文字として注文書PDFに印字されます。端末ごとの画像登録は不要です。</p></div></div>
-<div class="grid screen-actions" style="margin-top:14px">
-<div><label for="outputFormat">出力形式</label><select id="outputFormat"><option value="pdf" selected>PDF</option></select></div>
-<div><label for="sendMethod">送信方法</label><select id="sendMethod"><option value="device">複合機FAX</option><option value="network">ネットFAX</option></select></div>
-</div>
-<div class="actions screen-actions"><button class="green" onclick="downloadOrderPdf()">PDFで保存</button><button class="primary" onclick="sendFax()">FAX送信</button><button onclick="saveDraft()">注文内容を一時保存</button></div>
+<div class="actions screen-actions"><button class="green" type="button" onclick="printOrderAndAskHistory()">注文書を印刷（PDF保存）</button><button type="button" onclick="saveDraft()">注文内容を一時保存</button></div>
 </section>
 <div class="mobile-actionbar" aria-label="スマートフォン用操作">
- <button class="green" type="button" onclick="downloadOrderPdf()">PDFで保存</button>
- <button class="primary" type="button" onclick="sendFax()">FAX送信</button>
+ <button class="green" type="button" onclick="printOrderAndAskHistory()">注文書を印刷・PDF保存</button>
 </div>
 <section class="card history-card"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
-</div>
-
-<div id="faxShareModal" role="dialog" aria-modal="true" aria-labelledby="faxShareTitle" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(15,23,42,.62);padding:18px;align-items:center;justify-content:center">
- <div style="width:min(100%,480px);background:#fff;border-radius:16px;padding:20px;box-shadow:0 15px 50px #0004">
-  <h2 id="faxShareTitle" style="margin:0 0 10px">発注書PDFを作成しました</h2>
-  <p id="faxShareMessage" style="font-size:14px;line-height:1.65;color:#475467">「共有シートを開く」を押し、KYOCERA Mobile Printを選択してください。京セラ側でFAX送信を完了した後、この画面に戻って履歴登録します。</p>
-  <div style="display:grid;gap:10px;margin-top:16px">
-   <button id="faxShareButton" class="primary" type="button" onclick="sharePendingFaxPdf()" style="min-height:48px">共有シートを開く（KYOCERAへ）</button>
-   <button id="faxCompleteButton" class="green" type="button" onclick="completeFaxAndSaveHistory()" style="min-height:48px" disabled>FAX送信完了・注文履歴に登録</button>
-   <button type="button" onclick="closeFaxShareModal()" style="min-height:42px">閉じる（履歴登録しない）</button>
-  </div>
-  <p class="small" style="margin:12px 0 0">※ PDFを共有しただけでは注文履歴に登録されません。</p>
- </div>
 </div>
 
 <div class="printarea" id="printarea"></div>
@@ -368,21 +351,30 @@ function renderHistory(){
 }
 async function setReceived(oid,iid,v){const received=v==='1';setSharedStatus('入荷状況を更新しています…');try{const data=await apiCall('setReceived',{orderId:oid,itemId:iid,received});orders=data.orders||orders;renderHistory();setSharedStatus('入荷状況を全員に共有しました')}catch(e){alert('入荷状況を保存できませんでした。再読み込みして確認してください。\n'+e.message);setSharedStatus('入荷状況の更新に失敗しました')}}
 async function deleteOrder(id){if(!confirm('この注文履歴を全員の共有履歴から削除しますか？'))return;setSharedStatus('履歴を削除しています…');try{const data=await apiCall('deleteOrder',{orderId:id});orders=data.orders||[];renderHistory();setSharedStatus('履歴を共有削除しました')}catch(e){alert('履歴を削除できませんでした。'+e.message);setSharedStatus('履歴削除に失敗しました')}}
-// PDF保存：ブラウザー標準の印刷画面を開き、保存先で「PDFに保存」を選択する。履歴は登録しない。
+// 注文書を印刷し、印刷画面を閉じた後に注文履歴へ登録するか選択する。
 function createOrderNumber(){const now=new Date();return 'AUTO-'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'-'+now.getTime().toString().slice(-6)+'-'+Math.random().toString(36).slice(2,6).toUpperCase();}
 
-async function downloadOrderPdf(){
- $('outputFormat').value='pdf';
- // PDFには注文番号を印字するが、PDF保存だけでは履歴を登録しない。
+async function printOrderAndAskHistory(){
+ const rows=getOrderRows();
+ if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){
+   alert('仕入れ先名とFAX番号を入力してください。');return;
+ }
+ if(!rows.length){alert('商品名または数量を1件以上入力してください。');return;}
  if(!$('orderNo').value.trim())$('orderNo').value=createOrderNumber();
  if(!await buildPrintDocument())return;
  const oldTitle=document.title;
- const base=$('orderNo').value.trim()||$('orderDate').value||'注文書';
- document.title='注文書_'+base;
- setSharedStatus('印刷画面で保存先に「PDFに保存」を選択してください。PDF保存では注文履歴に登録しません。');
+ document.title='注文書_'+($('orderNo').value.trim()||$('orderDate').value||'注文書');
+ setSharedStatus('印刷画面を開いています。印刷した用紙をこれまでどおりFAXしてください。');
  try{window.print();}
  finally{document.title=oldTitle;}
- setSharedStatus('PDF保存画面を終了しました。PDF保存では注文履歴に登録していません。');
+ // window.print() は印刷完了・キャンセルを区別できないため、履歴登録は必ず本人に選んでもらう。
+ const register=confirm('印刷画面を閉じました。\n\nこの注文を「注文履歴・入荷管理」に登録しますか？\n\n「OK」：注文履歴に登録する\n「キャンセル」：登録しない');
+ if(register){
+   const ok=await saveOrderHistory(rows);
+   if(ok)alert('注文履歴に登録しました。入荷時は「注文履歴・入荷管理」から入荷済に変更できます。');
+ }else{
+   setSharedStatus('注文履歴には登録していません。');
+ }
 }
 
 function getOrderRows(){
@@ -397,148 +389,7 @@ function getOrderRows(){
    })
    .filter(x=>x.name||x.qty||x.maker);
 }
-let pendingFax=null;
-let faxShareReady=false;
 
-async function sendFax(){
- $('sendMethod').value='device';
- if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){
-   alert('仕入れ先名とFAX番号を入力してください。');return;
- }
- const rows=getOrderRows();
- if(!rows.length){alert('商品名または数量を1件以上入力してください。');return;}
- if(!$('orderNo').value.trim())$('orderNo').value=createOrderNumber();
- if(!await buildPrintDocument())return;
- // PCなど共有シート非対応環境では、従来どおり印刷画面から複合機FAXへ送る
- // PCはタッチ対応画面でも共有モーダルを使わず、通常の印刷画面へ進める。
- const isMobileDevice=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
- if(!isMobileDevice || !navigator.share){
-   const oldTitle=document.title;
-   document.title='注文書_'+($('orderNo').value.trim()||$('orderDate').value||'注文書');
-   setSharedStatus('印刷画面で複合機FAXを選択してください。送信後に戻って確認します。');
-   try{window.print();}finally{document.title=oldTitle;}
-   if(confirm('複合機側でFAX送信を完了しましたか？\n\n「OK」で注文履歴に登録します。')){
-     await saveOrderHistory(rows);
-   }else{
-     setSharedStatus('FAX送信未確認のため、注文履歴には登録していません。');
-   }
-   return;
- }
- if(typeof html2pdf==='undefined'){
-   alert('PDF作成ライブラリを読み込めませんでした。インターネット接続を確認して、もう一度お試しください。');return;
- }
- setSharedStatus('発注書PDFを作成しています…');
- try{
-   const render=document.createElement('div');
-   render.style.cssText='position:fixed;left:-12000px;top:0;width:794px;background:#fff;z-index:-1;';
-   render.innerHTML=`
-    <style>
-     .fax-pdf-page{box-sizing:border-box;width:794px;padding:28px 30px;background:#fff;color:#111;font-family:"Yu Gothic","Meiryo",sans-serif;font-size:13px;line-height:1.35}
-     .fax-pdf-page *{box-sizing:border-box}
-     .fax-pdf-page h1{text-align:center;font-size:25px;border-bottom:2px solid #111;padding-bottom:7px;margin:0 0 14px}
-     .fax-pdf-page .phead{display:flex;justify-content:space-between;gap:18px;margin:12px 0}
-     .fax-pdf-page .pbox{width:58%;padding:6px 0;min-height:55px;display:flex;align-items:center}
-     .fax-pdf-page .p-recipient{display:inline-block;font-size:27px;line-height:1.15;margin-bottom:3px}
-     .fax-pdf-page .pitems{width:100%;border-collapse:collapse;margin-top:12px;page-break-inside:auto;break-inside:auto}
-     .fax-pdf-page .pitems thead{display:table-header-group}
-     .fax-pdf-page .pitems tr{break-inside:avoid!important;page-break-inside:avoid!important}
-     .fax-pdf-page .pnote{break-inside:avoid!important;page-break-inside:avoid!important}
-     .fax-pdf-page .pitems th,.fax-pdf-page .pitems td{border:1px solid #222;padding:7px 8px;font-size:12px;line-height:1.3}
-     .fax-pdf-page .pitems th:first-child,.fax-pdf-page .pitems td:first-child{font-size:14px}
-     .fax-pdf-page .pitems th:last-child,.fax-pdf-page .pitems td:last-child{width:55px;white-space:nowrap;text-align:right}
-     .fax-pdf-page .pitems th{background:#eee}
-     .fax-pdf-page .pnote{border:1px solid #222;padding:8px;min-height:52px;margin-top:12px;white-space:pre-wrap}
-     .fax-pdf-page .pissuer{display:flex;justify-content:flex-end;align-items:flex-end;margin-top:14px;break-inside:avoid!important;page-break-inside:avoid!important}
-     .fax-pdf-page .psign{text-align:right;line-height:1.45;font-size:11px}
-     .fax-pdf-page .psign .company{font-size:16px;font-weight:700;color:#a00000;border:2px solid #a00000;display:inline-block;padding:5px 9px;margin-bottom:5px;letter-spacing:.08em}
-     .fax-pdf-page .psign strong{font-size:13px}
-    </style>
-    <div class="fax-pdf-page">${$('printarea').innerHTML}</div>`;
-   document.body.appendChild(render);
-   try{
-     const filename='注文書_'+($('orderNo').value.trim()||'FAX')+'.pdf';
-     const pdf=await html2pdf().set({
-       margin:[8,8,8,8],
-       image:{type:'jpeg',quality:0.98},
-       html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,scrollX:0,scrollY:0},
-       jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-       // 商品数に応じて自動改ページ。行・備考・社判は途中で分割しない。
-       pagebreak:{mode:['css','legacy'],avoid:['tr','.phead','.pnote','.pissuer']}
-     }).from(render.querySelector('.fax-pdf-page')).toPdf().get('pdf');
-     // 複数ページを保持する。商品行を削除せず、必要なページ数をそのまま出力する。
-     const blob=pdf.output('blob');
-     const file=new File([blob],filename,{type:'application/pdf'});
-     pendingFax={file,rows:JSON.parse(JSON.stringify(rows)),filename};
-     faxShareReady=false;
-     $('faxCompleteButton').disabled=true;
-     $('faxShareButton').disabled=false;
-     $('faxShareButton').textContent='共有シートを開く（KYOCERAへ）';
-     $('faxShareMessage').textContent='「共有シートを開く」を押し、共有先から「KYOCERA Print（Copy to KYOCERA Print）」を選択してPDFを取り込んでください。FAX送信操作が利用できる場合は京セラ側で送信し、完了後にこの画面へ戻って履歴登録します。';
-     $('faxShareModal').style.display='flex';
-     setSharedStatus('発注書PDFを作成しました。KYOCERA Mobile Printへ共有してください。');
-   }finally{
-     render.remove();
-   }
- }catch(e){
-   console.error(e);
-   setSharedStatus('発注書PDFの作成に失敗しました。');
-   alert('発注書PDFを作成できませんでした。\n'+(e&&e.message?e.message:'もう一度お試しください。'));
- }
-}
-
-async function sharePendingFaxPdf(){
- if(!pendingFax)return;
- const file=pendingFax.file;
- try{
-   if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
-     // ユーザーのタップ操作から直接共有シートを開く
-     await navigator.share({files:[file],title:pendingFax.filename,text:'FAX送信用の発注書です。'});
-     faxShareReady=true;
-     $('faxCompleteButton').disabled=false;
-     $('faxShareButton').textContent='もう一度共有する';
-     $('faxShareMessage').textContent='共有画面を閉じました。京セラ側でPDFの取り込みとFAX送信が完了したことを確認してから、下の「FAX送信完了・注文履歴に登録」を押してください。';
-     setSharedStatus('共有画面を終了しました。FAX送信完了後に履歴登録してください。');
-   }else{
-     const url=URL.createObjectURL(file);
-     const a=document.createElement('a');a.href=url;a.download=pendingFax.filename;
-     document.body.appendChild(a);a.click();a.remove();
-     setTimeout(()=>URL.revokeObjectURL(url),60000);
-     faxShareReady=true;
-     $('faxCompleteButton').disabled=false;
-     $('faxShareMessage').textContent='この端末ではPDF共有機能が使えないため、PDFを保存しました。ファイルアプリからPDFを開いて共有先にKYOCERA Mobile Printを選んでください。FAX送信後に下のボタンで履歴登録できます。';
-     setSharedStatus('PDFを保存しました。ファイルアプリからKYOCERA Mobile Printへ共有してください。');
-   }
- }catch(e){
-   if(e&&e.name==='AbortError'){
-     setSharedStatus('共有をキャンセルしました。注文履歴は登録していません。');
-     return;
-   }
-   alert('共有シートを開けませんでした。\n'+(e&&e.message?e.message:'PDFを保存してファイルアプリから共有してください。'));
- }
-}
-
-async function completeFaxAndSaveHistory(){
- if(!pendingFax||!faxShareReady)return;
- if(!confirm('京セラ側でFAX送信を完了しましたか？\n\n「OK」で注文履歴に登録します。'))return;
- const ok=await saveOrderHistory(pendingFax.rows);
- if(ok){
-   $('faxShareModal').style.display='none';
-   pendingFax=null;
-   faxShareReady=false;
-   $('faxCompleteButton').disabled=true;
-   setSharedStatus('FAX送信完了として注文履歴に登録しました。');
- }
-}
-function closeFaxShareModal(){
- if(pendingFax&&!faxShareReady){
-   if(!confirm('共有画面を閉じますか？注文履歴には登録されません。'))return;
- }
- $('faxShareModal').style.display='none';
- pendingFax=null;
- faxShareReady=false;
- $('faxCompleteButton').disabled=true;
- setSharedStatus('FAX送信画面を閉じました。注文履歴には登録していません。');
-}
 async function buildPrintDocument(){
  if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){
    alert('仕入れ先名とFAX番号を入力してください。');return false;
