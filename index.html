@@ -403,7 +403,9 @@ async function sendFax(){
  if(!$('orderNo').value.trim())$('orderNo').value=createOrderNumber();
  if(!await buildPrintDocument())return;
  // PCなど共有シート非対応環境では、従来どおり印刷画面から複合機FAXへ送る
- if(!navigator.share && !('ontouchstart' in window)){
+ // PCはタッチ対応画面でも共有モーダルを使わず、通常の印刷画面へ進める。
+ const isMobileDevice=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+ if(!isMobileDevice || !navigator.share){
    const oldTitle=document.title;
    document.title='注文書_'+($('orderNo').value.trim()||$('orderDate').value||'注文書');
    setSharedStatus('印刷画面で複合機FAXを選択してください。送信後に戻って確認します。');
@@ -450,8 +452,11 @@ async function sendFax(){
        image:{type:'jpeg',quality:0.98},
        html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,scrollX:0,scrollY:0},
        jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-       pagebreak:{mode:['css','legacy']}
+       // 発注書は1枚構成。CSS/legacyの改ページ判定による白紙ページを作らない。
+       pagebreak:{mode:[]}
      }).from(render.querySelector('.fax-pdf-page')).toPdf().get('pdf');
+     // 1ページ帳票のため、ライブラリの端数計算で追加された余分なページを除去する。
+     while(pdf.getNumberOfPages()>1) pdf.deletePage(pdf.getNumberOfPages());
      const blob=pdf.output('blob');
      const file=new File([blob],filename,{type:'application/pdf'});
      pendingFax={file,rows:JSON.parse(JSON.stringify(rows)),filename};
