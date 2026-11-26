@@ -309,13 +309,14 @@ async function downloadOrderPdf(){
  if(typeof html2pdf==='undefined'){alert('PDF作成ライブラリを読み込めませんでした。インターネット接続を確認してください。');return;}
  const source=$('printarea'),oldStyle=source.getAttribute('style');
  try{
-  // html2canvas は画面外（大きなマイナス left）の要素を正しく描画できない場合がある。
-  // 画面内の左上に配置し、背面に置いてPDF用DOMを確実にキャプチャする。
-  source.style.display='block';source.style.position='fixed';source.style.left='0';source.style.top='0';source.style.width='794px';source.style.zIndex='-1';source.style.background='#fff';source.style.color='#000';source.style.padding='0';source.style.margin='0';
+  // html2canvas が要素を確実に描画できるよう、キャプチャ中だけ画面最前面に配置する。
+  // z-index:-1 だと body 背景の後ろに隠れて白紙PDFになるため使用しない。
+  source.style.display='block';source.style.position='fixed';source.style.left='0';source.style.top='0';source.style.width='794px';source.style.zIndex='9998';source.style.background='#fff';source.style.color='#000';source.style.padding='0';source.style.margin='0';source.style.pointerEvents='none';
   await Promise.all([...source.querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve})));
   const opt={margin:8,filename:'注文書.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}};
   pendingPdfBlob=await html2pdf().set(opt).from(source).outputPdf('blob');
   if(!pendingPdfBlob||pendingPdfBlob.size<1000)throw new Error('PDFの内容が空です。注文内容を確認して再度お試しください。');
+  // PDF生成後に最低限のサイズを検査し、白紙・空データをプレビューに渡さない。
   if(pendingPdfUrl)URL.revokeObjectURL(pendingPdfUrl);
   pendingPdfUrl=URL.createObjectURL(pendingPdfBlob);
   $('pdfPreviewFrame').src=pendingPdfUrl;$('pdfPreviewModal').style.display='block';
