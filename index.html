@@ -79,9 +79,9 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
  .items .db-controls select{display:block;width:100%;min-width:0;min-height:46px;margin:7px 0;padding:10px 12px;font-size:16px;line-height:1.35;position:relative;z-index:2;pointer-events:auto;touch-action:manipulation;-webkit-appearance:menulist;appearance:auto;background-color:#fff;color:#243047;border:1px solid #94a3b8;border-radius:8px}
  .items .db-controls select:disabled{opacity:.65;background:#eef2f7;color:#667085}
  #supplierSelect{min-height:46px;font-size:16px;touch-action:manipulation;-webkit-appearance:menulist;appearance:auto}
- .mobile-actionbar{position:fixed;z-index:1000;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:9px 10px calc(9px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #d8dee8;box-shadow:0 -3px 14px #15274418}
- .mobile-actionbar button{min-height:48px;font-size:15px;border-radius:10px;width:100%;touch-action:manipulation}
- .mobile-actionbar .print-action{grid-column:1/-1}
+ .actions.screen-actions{display:none!important}
+ .mobile-actionbar{position:fixed;z-index:1000;left:0;right:0;bottom:0;display:block;padding:9px 12px calc(9px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #d8dee8;box-shadow:0 -3px 14px #15274418}
+ .mobile-actionbar button{display:block;min-height:52px;font-size:16px;border-radius:10px;width:100%;touch-action:manipulation;background:#1769d2;color:#fff}
  .mobile-actionbar .primary{background:#1769d2;color:#fff}
  .mobile-actionbar .green{background:#16835d;color:#fff}
 }
@@ -91,10 +91,9 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
  html,body{width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important;color:#000!important}
  /* visibility:hidden だけだと画面全体のレイアウト領域が印刷に残り、空白ページが発生する。
     印刷時は発注書以外の要素を display:none にして、発注書だけを通常フローで印刷する。 */
- body > :not(#printarea){display:none!important}
- body *{visibility:hidden!important}
- #printarea,#printarea *{visibility:visible!important}
- #printarea{display:block!important;position:relative!important;left:auto!important;top:auto!important;width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;break-after:auto!important;page-break-after:auto!important;font-family:"Yu Gothic","Meiryo",sans-serif;font-size:9pt;line-height:1.15}
+ body > .app{display:none!important}
+ body > #printarea{display:block!important;visibility:visible!important;position:static!important;width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;break-after:auto!important;page-break-after:auto!important;font-family:"Yu Gothic","Meiryo",sans-serif;font-size:9pt;line-height:1.15}
+ #printarea *{visibility:visible!important}
  #printarea h1{text-align:center;font-size:18pt;border-bottom:1.5px solid #000;padding-bottom:4px;margin:0 0 8px}
  #printarea .phead{display:flex;justify-content:space-between;margin:8px 0}
  #printarea .pbox{border:0;padding:5px 0;min-height:0;display:flex;align-items:center}
@@ -167,9 +166,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div class="actions screen-actions"><button class="green" type="button" onclick="downloadOrderPdf()">PDFで保存</button><button class="primary" type="button" onclick="sendFax()">FAX送信</button><button type="button" onclick="saveDraft()">注文内容を一時保存</button></div>
 </section>
 <div class="mobile-actionbar" aria-label="スマートフォン用操作">
- <button class="green" type="button" onclick="downloadOrderPdf()">PDFで保存</button>
- <button class="primary" type="button" onclick="sendFax()">FAX送信</button>
- <button class="print-action" type="button" onclick="printOrderAndAskHistory()">注文書を印刷・PDF保存</button>
+ <button class="print-action" type="button" onclick="printOrderAndAskHistory()">PDFを印刷</button>
 </div>
 <section class="card history-card"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
 </div>
@@ -361,7 +358,7 @@ function createOrderNumber(){const now=new Date();return 'AUTO-'+now.getFullYear
 
 async function downloadOrderPdf(){
  if(!$('orderNo').value.trim())$('orderNo').value=createOrderNumber();
- if(!await buildPrintDocument())return;
+ if(!buildPrintDocument())return;
  const isMobileDevice=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/i.test(navigator.userAgent));
  if(isMobileDevice){
    if(typeof html2pdf==='undefined'){
@@ -382,7 +379,7 @@ async function downloadOrderPdf(){
  const oldTitle=document.title;
  document.title='注文書_'+($('orderNo').value.trim()||$('orderDate').value||'注文書');
  setSharedStatus('印刷画面で保存先に「PDFに保存」を選択してください。PDF保存では注文履歴に登録しません。');
- try{window.print();}finally{document.title=oldTitle;}
+ try{window.print();}catch(e){console.error(e);alert('印刷画面を開けませんでした。ブラウザーの印刷機能を確認してください。');}finally{document.title=oldTitle;}
  setSharedStatus('PDF保存画面を終了しました。PDF保存では注文履歴に登録していません。');
 }
 
@@ -393,7 +390,7 @@ async function sendFax(){
  const rows=getOrderRows();
  if(!rows.length){alert('商品名または数量を1件以上入力してください。');return;}
  if(!$('orderNo').value.trim())$('orderNo').value=createOrderNumber();
- if(!await buildPrintDocument())return;
+ if(!buildPrintDocument())return;
  const isMobileDevice=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/i.test(navigator.userAgent));
  if(isMobileDevice){
    if(typeof html2pdf==='undefined'){
@@ -434,7 +431,7 @@ async function sendFax(){
  const oldTitle=document.title;
  document.title='注文書_'+($('orderNo').value.trim()||$('orderDate').value||'注文書');
  setSharedStatus('印刷画面で複合機FAXを選択してください。送信後に戻って確認します。');
- try{window.print();}finally{document.title=oldTitle;}
+ try{window.print();}catch(e){console.error(e);alert('印刷画面を開けませんでした。ブラウザーの印刷機能を確認してください。');}finally{document.title=oldTitle;}
  if(confirm('複合機側でFAX送信を完了しましたか？\n\n「OK」で注文履歴に登録します。'))await saveOrderHistory(rows);
  else setSharedStatus('FAX送信未確認のため、注文履歴には登録していません。');
 }
@@ -446,11 +443,12 @@ async function printOrderAndAskHistory(){
  }
  if(!rows.length){alert('商品名または数量を1件以上入力してください。');return;}
  if(!$('orderNo').value.trim())$('orderNo').value=createOrderNumber();
- if(!await buildPrintDocument())return;
+ if(!buildPrintDocument())return;
  const oldTitle=document.title;
  document.title='注文書_'+($('orderNo').value.trim()||$('orderDate').value||'注文書');
  setSharedStatus('印刷画面を開いています。印刷した用紙をこれまでどおりFAXしてください。');
  try{window.print();}
+ catch(e){console.error(e);alert('印刷画面を開けませんでした。ブラウザーの印刷機能を確認してください。');}
  finally{document.title=oldTitle;}
  // window.print() は印刷完了・キャンセルを区別できないため、履歴登録は必ず本人に選んでもらう。
  const register=confirm('印刷画面を閉じました。\n\nこの注文を「注文履歴・入荷管理」に登録しますか？\n\n「OK」：注文履歴に登録する\n「キャンセル」：登録しない');
@@ -475,7 +473,7 @@ function getOrderRows(){
    .filter(x=>x.name||x.qty||x.maker);
 }
 
-async function buildPrintDocument(){
+function buildPrintDocument(){
  if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){
    alert('仕入れ先名とFAX番号を入力してください。');return false;
  }
