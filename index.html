@@ -598,8 +598,15 @@ function addUsualItemToOrder(index){
  const supplierIndex=suppliers.findIndex(v=>supplierMakerKey(v.name)==='ヒロヤ'||v.name===makerLabel('ヒロヤ'));
  if(supplierIndex>=0){$('supplierSelect').value=String(supplierIndex);selectSupplier();}else $('supplierName').value=makerLabel('ヒロヤ');
  const rowName=x.variant?`${x.name} / ${x.variant}`:x.name;
- addItem(rowName,'');
- const tr=$('itemRows').lastElementChild;
+ // 最初から表示されている空の商品行を優先して使う。
+ // 空行を残したまま次の行を追加しないようにする。
+ let tr=[...$('itemRows').querySelectorAll('tr')].find(r=>{
+  const name=r.querySelector('.iname')?.value.trim()||'';
+  const quantity=r.querySelector('.qty')?.value.trim()||'';
+  return !name&&!quantity;
+ });
+ if(!tr){addItem(rowName,'');tr=$('itemRows').lastElementChild;}
+ else tr.querySelector('.iname').value=rowName;
  const maker=tr?.querySelector('.db-maker');if(maker){maker.value='ヒロヤ';tr._setMaker?.('ヒロヤ');}
  const qty=tr?.querySelector('.qty');
  $('usualSelectedSummary').textContent='追加しました：'+x.name+(x.variant?' / '+x.variant:'')+'（数量を入力してください）';
