@@ -34,6 +34,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 .supplierlist{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .supplierchip{padding:6px 10px;background:#eef4ff;border-radius:20px;font-size:12px}
 .notice{background:#fff8e7;border:1px solid #f0d48b;padding:12px;border-radius:9px;font-size:13px}
+.mobile-history-jump{display:none}
 @media(max-width:700px){body{padding:10px}.grid{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}}
 /* Smartphone専用レイアウト */
 @media(max-width:700px){
@@ -44,6 +45,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
  header p{font-size:11px;line-height:1.4}
  header .screen-actions button{padding:9px 11px;white-space:nowrap}
  .notice{margin:8px 10px;padding:10px;font-size:12px;line-height:1.55}
+ .mobile-history-jump{display:block;width:calc(100% - 20px);margin:8px 10px 12px;min-height:50px;padding:12px 16px;background:#16835d;color:#fff;font-size:16px;font-weight:800;border-radius:11px;box-shadow:0 2px 7px #16835d33;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
  .card{border-radius:12px;margin:10px;padding:14px;box-shadow:0 1px 5px #1527440a}
  h2{font-size:16px;margin-bottom:12px}
  .grid{grid-template-columns:1fr;gap:10px}
@@ -84,6 +86,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
  .mobile-actionbar button{display:block;min-height:52px;font-size:16px;border-radius:10px;width:100%;touch-action:manipulation;background:#1769d2;color:#fff}
  .mobile-actionbar .primary{background:#1769d2;color:#fff}
  .mobile-actionbar .green{background:#16835d;color:#fff}
+ .mobile-history-jump{display:none}
 }
 @media(min-width:701px){.mobile-actionbar{display:none!important}}
 @media print{
@@ -132,6 +135,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div class="app">
 <header><div><h1>国内仕入れ FAX注文書</h1><p>仕入れ先を登録して、注文書を作成・印刷できます</p></div>
 <div class="screen-actions"><button onclick="newOrder()">新規注文</button></div></header>
+<button class="mobile-history-jump" type="button" onclick="openOrderHistory()">📋 注文履歴・入荷管理を見る</button>
 <div class="notice">注文書を作成して印刷し、印刷した用紙をこれまでどおりFAXしてください。印刷画面を閉じた後、注文履歴に登録するかどうかを選べます。入荷管理は下の「注文履歴・入荷管理」から今までどおり操作できます。</div>
 
 <section class="card supplier-card">
@@ -168,7 +172,7 @@ button{border:0;border-radius:8px;padding:10px 15px;font:inherit;font-weight:700
 <div class="mobile-actionbar" aria-label="スマートフォン用操作">
  <button class="print-action" type="button" onclick="printOrderAndAskHistory()">PDFを印刷</button>
 </div>
-<section class="card history-card"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
+<section class="card history-card" id="orderHistorySection"><h2>③ 注文履歴・入荷管理</h2><div class="grid"><div><label>履歴検索（注文者・仕入れ先・商品・注文番号）</label><input id="historySearch" placeholder="キーワードを入力" oninput="renderHistory()"></div><div><label>入荷状況</label><select id="historyFilter" onchange="renderHistory()"><option value="all">すべて</option><option value="pending">未入荷あり</option><option value="received">すべて入荷済</option></select></div></div><div id="historyList"></div><p class="small" id="sharedStatus">共有データベースに接続しています…</p></section>
 </div>
 
 <div class="printarea" id="printarea"></div>
@@ -179,6 +183,21 @@ const $=id=>document.getElementById(id);
 let suppliers=[];
 let orders=[];
 let sharedReady=false;
+// 共有データを端末内にも保存し、2回目以降は先に即時表示してから最新情報へ同期する。
+const SHARED_CACHE_KEY='faxorder_shared_cache_v1';
+function saveSharedCache(){
+ try{localStorage.setItem(SHARED_CACHE_KEY,JSON.stringify({savedAt:Date.now(),suppliers,orders}));}catch(e){console.warn('共有データの端末保存をスキップしました',e);}
+}
+function restoreSharedCache(){
+ try{
+  const raw=localStorage.getItem(SHARED_CACHE_KEY);if(!raw)return false;
+  const data=JSON.parse(raw);if(!data||!Array.isArray(data.suppliers)||!Array.isArray(data.orders))return false;
+  suppliers=data.suppliers;orders=data.orders;sharedReady=true;
+  renderSuppliers();renderHistory();
+  setSharedStatus('保存済みデータを表示中｜最新情報を確認しています…');
+  return true;
+ }catch(e){return false;}
+}
 // GitHub Pages版：config.js に設定したGASウェブアプリURLへJSONPで接続
 const GAS_API_URL=(window.APP_CONFIG&&window.APP_CONFIG.GAS_API_URL)||'';
 function apiCall(action,data={}){
@@ -227,9 +246,9 @@ async function saveSupplier(){
  if(!name||!fax){alert('仕入れ先名とFAX番号を入力してください。');return}
  const i=$('supplierSelect').value,oldName=(i!==''&&suppliers[i])?suppliers[i].name:'';
  setSharedStatus('仕入先情報を保存しています…');
- try{const data=await apiCall('upsertSupplier',{supplier:{name,fax,address},oldName});suppliers=data.suppliers||[];renderSuppliers();const ix=suppliers.findIndex(x=>x.name===name);if(ix>=0)$('supplierSelect').value=String(ix);setSharedStatus('仕入先情報を全員に共有しました');alert('仕入先情報を全員に共有しました。')}catch(e){setSharedStatus('仕入先の保存に失敗しました');alert('仕入先を保存できませんでした。'+e.message)}
+ try{const data=await apiCall('upsertSupplier',{supplier:{name,fax,address},oldName});suppliers=data.suppliers||[];saveSharedCache();renderSuppliers();const ix=suppliers.findIndex(x=>x.name===name);if(ix>=0)$('supplierSelect').value=String(ix);setSharedStatus('仕入先情報を全員に共有しました');alert('仕入先情報を全員に共有しました。')}catch(e){setSharedStatus('仕入先の保存に失敗しました');alert('仕入先を保存できませんでした。'+e.message)}
 }
-async function deleteSupplier(){let i=$('supplierSelect').value;if(i===''||!suppliers[i]){alert('削除する登録先を選択してください。');return}const name=suppliers[i].name;if(confirm(name+' を登録一覧から削除しますか？')){setSharedStatus('仕入先を削除しています…');try{const data=await apiCall('deleteSupplier',{name});suppliers=data.suppliers||[];renderSuppliers();$('supplierSelect').value='';$('supplierName').value='';$('supplierFax').value='';$('supplierAddress').value='';setSharedStatus('仕入先を全員の一覧から削除しました')}catch(e){alert('仕入先を削除できませんでした。'+e.message);setSharedStatus('仕入先削除に失敗しました')}}}
+async function deleteSupplier(){let i=$('supplierSelect').value;if(i===''||!suppliers[i]){alert('削除する登録先を選択してください。');return}const name=suppliers[i].name;if(confirm(name+' を登録一覧から削除しますか？')){setSharedStatus('仕入先を削除しています…');try{const data=await apiCall('deleteSupplier',{name});suppliers=data.suppliers||[];saveSharedCache();renderSuppliers();$('supplierSelect').value='';$('supplierName').value='';$('supplierFax').value='';$('supplierAddress').value='';setSharedStatus('仕入先を全員の一覧から削除しました')}catch(e){alert('仕入先を削除できませんでした。'+e.message);setSharedStatus('仕入先削除に失敗しました')}}}
 function normalizeSearchText(value){
  return String(value??'').normalize('NFKC').toLowerCase().replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60)).replace(/[\s　]+/g,'');
 }
@@ -344,15 +363,22 @@ async function saveOrderHistory(rows){
  const record={id:no,date:$('orderDate').value||now.toISOString().slice(0,10),createdAt:now.toISOString(),operator:$('sender').value.trim(),supplier:$('supplierName').value.trim(),fax:$('supplierFax').value.trim(),items:rows.map((x,i)=>({id:no+'-'+i,maker:x.maker||'',name:x.name,qty:x.qty,received:false})),notes:$('notes').value};
  // 同じ注文番号がある場合は確認を挟まず最新内容で更新する。
  setSharedStatus('注文履歴を共有保存しています…');
- try{const saved=await apiCall('saveOrder',{record});const ix=orders.findIndex(o=>o.id===saved.id);if(ix>=0)orders[ix]=saved;else orders.unshift(saved);$('orderNo').value=no;renderHistory();setSharedStatus('注文履歴を全員に共有しました');return true;}catch(e){setSharedStatus('注文履歴の保存に失敗しました');alert('共有保存に失敗しました。印刷前に通信状態を確認してください。\n'+e.message);return false;}
+ try{const saved=await apiCall('saveOrder',{record});const ix=orders.findIndex(o=>o.id===saved.id);if(ix>=0)orders[ix]=saved;else orders.unshift(saved);saveSharedCache();$('orderNo').value=no;renderHistory();setSharedStatus('注文履歴を全員に共有しました');return true;}catch(e){setSharedStatus('注文履歴の保存に失敗しました');alert('共有保存に失敗しました。印刷前に通信状態を確認してください。\n'+e.message);return false;}
+}
+function openOrderHistory(){
+ const section=$('orderHistorySection');
+ if(!section)return;
+ // 取得済みの共有データをその場で即時描画し、履歴欄へ一度で移動する。
+ renderHistory();
+ section.scrollIntoView({behavior:'auto',block:'start'});
 }
 function renderHistory(){
  const q=($('historySearch')?.value||'').trim().toLowerCase(),f=$('historyFilter')?.value||'all';
  const list=orders.filter(o=>{const hay=[o.id,o.date,o.operator,o.supplier,...o.items.map(i=>i.name)].join(' ').toLowerCase(),done=o.items.length>0&&o.items.every(i=>i.received);return(!q||hay.includes(q))&&(f==='all'||(f==='pending'&&!done)||(f==='received'&&done));});
  $('historyList').innerHTML=list.length?list.map(o=>`<div class="history-order"><div class="history-order-head"><div><b>注文番号：${esc(o.id)}</b><br>${esc(o.createdAt?new Date(o.createdAt).toLocaleString('ja-JP'):o.date)}　注文者：${esc(o.operator||'未入力')}　仕入れ先：${esc(o.supplier)}</div><button class="danger" onclick="deleteOrder('${esc(o.id)}')">履歴削除</button></div><table class="history-table"><thead><tr><th>商品名</th><th>数量</th><th>入荷状況</th></tr></thead><tbody>${o.items.map(it=>`<tr><td><div class="history-item-name"><span>${esc(it.name)}</span><span class="item-status ${it.received?'received':'pending'}">${it.received?'入荷済':'未入荷'}</span></div></td><td>${esc(it.qty)}</td><td><select class="status-select" aria-label="入荷状況" onchange="setReceived('${esc(o.id)}','${esc(it.id)}',this.value)"><option value="0" ${!it.received?'selected':''}>未入荷</option><option value="1" ${it.received?'selected':''}>入荷済</option></select></td></tr>`).join('')}</tbody></table></div>`).join(''):'<p class="small">該当する注文履歴はありません。</p>';
 }
-async function setReceived(oid,iid,v){const received=v==='1';setSharedStatus('入荷状況を更新しています…');try{const data=await apiCall('setReceived',{orderId:oid,itemId:iid,received});orders=data.orders||orders;renderHistory();setSharedStatus('入荷状況を全員に共有しました')}catch(e){alert('入荷状況を保存できませんでした。再読み込みして確認してください。\n'+e.message);setSharedStatus('入荷状況の更新に失敗しました')}}
-async function deleteOrder(id){if(!confirm('この注文履歴を全員の共有履歴から削除しますか？'))return;setSharedStatus('履歴を削除しています…');try{const data=await apiCall('deleteOrder',{orderId:id});orders=data.orders||[];renderHistory();setSharedStatus('履歴を共有削除しました')}catch(e){alert('履歴を削除できませんでした。'+e.message);setSharedStatus('履歴削除に失敗しました')}}
+async function setReceived(oid,iid,v){const received=v==='1';setSharedStatus('入荷状況を更新しています…');try{const data=await apiCall('setReceived',{orderId:oid,itemId:iid,received});orders=data.orders||orders;saveSharedCache();renderHistory();setSharedStatus('入荷状況を全員に共有しました')}catch(e){alert('入荷状況を保存できませんでした。再読み込みして確認してください。\n'+e.message);setSharedStatus('入荷状況の更新に失敗しました')}}
+async function deleteOrder(id){if(!confirm('この注文履歴を全員の共有履歴から削除しますか？'))return;setSharedStatus('履歴を削除しています…');try{const data=await apiCall('deleteOrder',{orderId:id});orders=data.orders||[];saveSharedCache();renderHistory();setSharedStatus('履歴を共有削除しました')}catch(e){alert('履歴を削除できませんでした。'+e.message);setSharedStatus('履歴削除に失敗しました')}}
 // 注文書を印刷し、印刷画面を閉じた後に注文履歴へ登録するか選択する。
 function createOrderNumber(){const now=new Date();return 'AUTO-'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'-'+now.getTime().toString().slice(-6)+'-'+Math.random().toString(36).slice(2,6).toUpperCase();}
 
@@ -547,9 +573,22 @@ function buildPrintDocument(){
  return true;
 }
 function setSharedStatus(msg){const el=$('sharedStatus');if(el)el.textContent=msg}
-async function refreshSharedData(silent=false){if(!silent)setSharedStatus('共有データを読み込んでいます…');try{const data=await apiCall('getData');suppliers=data.suppliers||[];orders=data.orders||[];sharedReady=true;renderSuppliers();renderHistory();if(!silent)setSharedStatus('共有データに接続中｜変更は約30秒以内に他の端末へ反映されます')}catch(e){if(!silent){setSharedStatus('共有データに接続できません。GASの公開設定・config.jsのURLを確認してください。');alert('共有データに接続できませんでした。\n'+e.message)}}}
+async function refreshSharedData(silent=false){
+ if(!silent&&!sharedReady)setSharedStatus('共有データを読み込んでいます…');
+ try{
+  const data=await apiCall('getData');
+  suppliers=data.suppliers||[];orders=data.orders||[];sharedReady=true;
+  saveSharedCache();renderSuppliers();renderHistory();
+  setSharedStatus('共有データに接続中｜最新情報に同期済み');
+ }catch(e){
+  if(!sharedReady){setSharedStatus('共有データに接続できません。保存済みデータがあれば引き続き表示します。');if(!silent)alert('共有データに接続できませんでした。\n'+e.message);}
+  else setSharedStatus('保存済みデータを表示中｜共有サーバーに接続できません');
+ }
+}
 $('orderDate').value=new Date().toISOString().slice(0,10);renderSuppliers();addItem();renderHistory();
 let draft=JSON.parse(localStorage.getItem('faxorder_draft')||'null');$('sender').value=localStorage.getItem('faxorder_sender')??draft?.sender??'';if(draft){$('orderNo').value=draft.no||'';$('subject').value=draft.subject||'';$('notes').value=draft.notes||''}
-$('sender').addEventListener('input',()=>localStorage.setItem('faxorder_sender',$('sender').value));refreshSharedData();setInterval(()=>refreshSharedData(true),30000);
+$('sender').addEventListener('input',()=>localStorage.setItem('faxorder_sender',$('sender').value));
+// 初回に取得した共有データを端末へ保存。次回は保存済みデータを先に表示して待ち時間を短縮。
+restoreSharedCache();refreshSharedData(true);setInterval(()=>refreshSharedData(true),30000);
 </script>
 </body></html>
