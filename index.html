@@ -509,7 +509,7 @@ function closeFaxShareModal(){
  setSharedStatus('FAX送信画面を閉じました。注文履歴には登録していません。');
 }
 
-function printOrderAndAskHistory(){
+async function printOrderAndAskHistory(){
  const rows=getOrderRows();
  if(!$('supplierName').value.trim()||!$('supplierFax').value.trim()){
    alert('仕入れ先名とFAX番号を入力してください。');return;
