@@ -366,7 +366,9 @@ async function downloadOrderPdf(){
    }
    const render=document.createElement('div');
    render.style.cssText='position:fixed;left:-12000px;top:0;width:794px;background:#fff;z-index:-1;';
-   render.innerHTML='<div style="box-sizing:border-box;width:794px;padding:28px 30px;background:#fff;color:#111;font-family:Yu Gothic,Meiryo,sans-serif;font-size:13px;line-height:1.35">'+$('printarea').innerHTML+'</div>';
+   render.innerHTML='<div style="box-sizing:border-box;width:794px;padding:28px 30px;background:#fff;color:#111;font-family:Yu Gothic,Meiryo,sans-serif;font-size:13px;line-height:1.35">'+
+     '<style>h1{text-align:center;font-size:24px;border-bottom:2px solid #111;padding-bottom:6px;margin:0 0 14px}.phead{display:flex;justify-content:space-between;gap:18px;margin:12px 0}.pbox{padding:5px 0;min-height:0;display:flex;align-items:center}.p-recipient{display:inline-block;font-size:27px;line-height:1.1;margin-bottom:3px}.pitems{width:100%;border-collapse:collapse;margin-top:12px}.pitems th,.pitems td{border:1px solid #111;padding:6px 8px;font-size:12px;line-height:1.25}.pitems th{background:#eee}.pitems th:first-child,.pitems td:first-child{font-size:14px}.pitems th:last-child,.pitems td:last-child{width:48px;white-space:nowrap}.pnote{border:1px solid #111;padding:8px;min-height:48px;margin-top:12px;white-space:pre-wrap}.pissuer{display:flex;justify-content:flex-end;align-items:flex-end;margin-top:18px;break-inside:avoid;page-break-inside:avoid}.psign{text-align:right;line-height:1.5;font-size:12px}.psign .company{font-size:16px;font-weight:700;color:#a00000;border:2px solid #a00000;display:inline-block;padding:5px 9px;margin-bottom:5px;letter-spacing:.08em}.psign strong{font-size:13px}</style>'+ 
+     $('printarea').innerHTML+'</div>';
    document.body.appendChild(render);
    try{
      const filename='注文書_'+$('orderNo').value.trim()+'.pdf';
@@ -399,7 +401,9 @@ async function sendFax(){
    setSharedStatus('FAX送信用PDFを作成しています…');
    const render=document.createElement('div');
    render.style.cssText='position:fixed;left:-12000px;top:0;width:794px;background:#fff;z-index:-1;';
-   render.innerHTML='<div style="box-sizing:border-box;width:794px;padding:28px 30px;background:#fff;color:#111;font-family:Yu Gothic,Meiryo,sans-serif;font-size:13px;line-height:1.35">'+$('printarea').innerHTML+'</div>';
+   render.innerHTML='<div style="box-sizing:border-box;width:794px;padding:28px 30px;background:#fff;color:#111;font-family:Yu Gothic,Meiryo,sans-serif;font-size:13px;line-height:1.35">'+
+     '<style>h1{text-align:center;font-size:24px;border-bottom:2px solid #111;padding-bottom:6px;margin:0 0 14px}.phead{display:flex;justify-content:space-between;gap:18px;margin:12px 0}.pbox{padding:5px 0;min-height:0;display:flex;align-items:center}.p-recipient{display:inline-block;font-size:27px;line-height:1.1;margin-bottom:3px}.pitems{width:100%;border-collapse:collapse;margin-top:12px}.pitems th,.pitems td{border:1px solid #111;padding:6px 8px;font-size:12px;line-height:1.25}.pitems th{background:#eee}.pitems th:first-child,.pitems td:first-child{font-size:14px}.pitems th:last-child,.pitems td:last-child{width:48px;white-space:nowrap}.pnote{border:1px solid #111;padding:8px;min-height:48px;margin-top:12px;white-space:pre-wrap}.pissuer{display:flex;justify-content:flex-end;align-items:flex-end;margin-top:18px;break-inside:avoid;page-break-inside:avoid}.psign{text-align:right;line-height:1.5;font-size:12px}.psign .company{font-size:16px;font-weight:700;color:#a00000;border:2px solid #a00000;display:inline-block;padding:5px 9px;margin-bottom:5px;letter-spacing:.08em}.psign strong{font-size:13px}</style>'+ 
+     $('printarea').innerHTML+'</div>';
    document.body.appendChild(render);
    try{
      const filename='注文書_'+$('orderNo').value.trim()+'.pdf';
@@ -444,13 +448,78 @@ async function printOrderAndAskHistory(){
  if(!rows.length){alert('商品名または数量を1件以上入力してください。');return;}
  if(!$('orderNo').value.trim())$('orderNo').value=createOrderNumber();
  if(!buildPrintDocument())return;
+
+ // スマートフォンだけPDFを直接生成してプレビューする。PCの印刷処理には触れない。
+ const isMobileDevice=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/i.test(navigator.userAgent));
+ if(isMobileDevice){
+   if(typeof html2pdf==='undefined'){
+     alert('PDF作成ライブラリを読み込めませんでした。通信環境を確認して、もう一度お試しください。');return;
+   }
+
+   // iPhone等で非同期処理後の新規タブがブロックされないよう、タップ直後に開く。
+   const previewWindow=window.open('about:blank','_blank');
+   const overlay=document.createElement('div');
+   overlay.style.cssText='position:fixed;inset:0;z-index:20002;background:rgba(255,255,255,.96);display:flex;align-items:center;justify-content:center;font: bold 16px sans-serif;color:#243047;';
+   overlay.textContent='注文書PDFを作成しています…';
+   document.body.appendChild(overlay);
+
+   const render=document.createElement('div');
+   render.style.cssText='position:fixed;left:0;top:0;width:794px;background:#fff;color:#111;z-index:20001;pointer-events:none;font-family:"Yu Gothic","Meiryo",sans-serif;';
+   render.innerHTML='<div style="box-sizing:border-box;width:794px;padding:28px 30px;background:#fff;color:#111;font-family:Yu Gothic,Meiryo,sans-serif;font-size:13px;line-height:1.35">'+
+     '<style>h1{text-align:center;font-size:24px;border-bottom:2px solid #111;padding-bottom:6px;margin:0 0 14px}.phead{display:flex;justify-content:space-between;gap:18px;margin:12px 0}.pbox{padding:5px 0;min-height:0;display:flex;align-items:center}.p-recipient{display:inline-block;font-size:27px;line-height:1.1;margin-bottom:3px}.pitems{width:100%;border-collapse:collapse;margin-top:12px}.pitems th,.pitems td{border:1px solid #111;padding:6px 8px;font-size:12px;line-height:1.25}.pitems th{background:#eee}.pitems th:first-child,.pitems td:first-child{font-size:14px}.pitems th:last-child,.pitems td:last-child{width:48px;white-space:nowrap}.pnote{border:1px solid #111;padding:8px;min-height:48px;margin-top:12px;white-space:pre-wrap}.pissuer{display:flex;justify-content:flex-end;align-items:flex-end;margin-top:18px;break-inside:avoid;page-break-inside:avoid}.psign{text-align:right;line-height:1.5;font-size:12px}.psign .company{font-size:16px;font-weight:700;color:#a00000;border:2px solid #a00000;display:inline-block;padding:5px 9px;margin-bottom:5px;letter-spacing:.08em}.psign strong{font-size:13px}</style>'+ 
+     $('printarea').innerHTML+'</div>';
+   document.body.appendChild(render);
+
+   try{
+     const filename='注文書_'+$('orderNo').value.trim()+'.pdf';
+     const pdf=await html2pdf().set({
+       margin:[8,8,8,8],
+       image:{type:'jpeg',quality:.98},
+       html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff',logging:false,scrollX:0,scrollY:0},
+       jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+       pagebreak:{mode:['css','legacy'],avoid:['tr','.phead','.pnote','.pissuer']}
+     }).from(render.firstElementChild).toPdf().get('pdf');
+     const blob=pdf.output('blob');
+     const blobUrl=URL.createObjectURL(blob);
+
+     if(previewWindow&&!previewWindow.closed){
+       previewWindow.location.href=blobUrl;
+       // PDFタブが読み込み終わる前にURLを破棄しない。
+       setTimeout(()=>URL.revokeObjectURL(blobUrl),120000);
+       setSharedStatus('注文書PDFを開きました。プレビューから印刷できます。');
+     }else{
+       // ポップアップを許可していない場合はPDFファイルとして保存できるようにする。
+       const a=document.createElement('a');a.href=blobUrl;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+       setTimeout(()=>URL.revokeObjectURL(blobUrl),120000);
+       setSharedStatus('注文書PDFを保存しました。ファイルを開いて印刷してください。');
+     }
+   }catch(e){
+     console.error(e);
+     if(previewWindow&&!previewWindow.closed)previewWindow.close();
+     alert('注文書PDFを作成できませんでした。通信環境を確認して、もう一度お試しください。'+(e&&e.message?'\n'+e.message:''));
+     setSharedStatus('PDF作成に失敗しました。');
+     return;
+   }finally{
+     render.remove();overlay.remove();
+   }
+
+   const register=confirm('注文書PDFを開きました。\n\nこの注文を「注文履歴・入荷管理」に登録しますか？\n\n「OK」：注文履歴に登録する\n「キャンセル」：登録しない');
+   if(register){
+     const ok=await saveOrderHistory(rows);
+     if(ok)alert('注文履歴に登録しました。入荷時は「注文履歴・入荷管理」から入荷済に変更できます。');
+   }else{
+     setSharedStatus('注文履歴には登録していません。');
+   }
+   return;
+ }
+
+ // PC版は動作確認済みの従来処理をそのまま維持。
  const oldTitle=document.title;
  document.title='注文書_'+($('orderNo').value.trim()||$('orderDate').value||'注文書');
  setSharedStatus('印刷画面を開いています。印刷した用紙をこれまでどおりFAXしてください。');
  try{window.print();}
  catch(e){console.error(e);alert('印刷画面を開けませんでした。ブラウザーの印刷機能を確認してください。');}
  finally{document.title=oldTitle;}
- // window.print() は印刷完了・キャンセルを区別できないため、履歴登録は必ず本人に選んでもらう。
  const register=confirm('印刷画面を閉じました。\n\nこの注文を「注文履歴・入荷管理」に登録しますか？\n\n「OK」：注文履歴に登録する\n「キャンセル」：登録しない');
  if(register){
    const ok=await saveOrderHistory(rows);
