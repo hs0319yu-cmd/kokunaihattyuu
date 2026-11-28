@@ -283,21 +283,34 @@ function normalizeSearchText(value){
  return String(value??'').normalize('NFKC').toLowerCase().replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60)).replace(/[\s　]+/g,'');
 }
 function searchScore(query, item){
- const q=normalizeSearchText(query);
+ const raw=String(query??'');
+ const q=normalizeSearchText(raw);
  if(!q)return 0;
  let score=0;
- // 品番（例：KA-3）は最優先で評価。完全一致を部分一致より必ず上位にする。
  const code=normalizeSearchText(item.code);
- if(code){
-  if(code===q)score+=100000;
-  else if(code.startsWith(q))score+=50000;
-  else if(code.includes(q))score+=30000;
+ // 商品名の文章中に含まれる品番も抽出して、品番一致を最優先する。
+ const codeTokens=(raw.match(/[A-Za-z]{1,6}[-ー－]?[0-9]{1,5}[A-Za-z0-9-]*/g)||[]).map(normalizeSearchText);
+ for(const token of codeTokens){
+  if(!token)continue;
+  if(code===token)score+=1000000;
+  else if(code.startsWith(token))score+=500000;
+  else if(code.includes(token))score+=250000;
  }
+ const name=normalizeSearchText(item.name);
+ const maker=normalizeSearchText(item.maker);
+ const kind=normalizeSearchText(item.kind);
+ const size=normalizeSearchText(item.size);
+ // 品番以外も、商品名・規格・サイズ・メーカーを横断して照合する。
+ if(name&&q.includes(name))score+=80000;
+ if(kind&&q.includes(kind))score+=30000;
+ if(size&&q.includes(size))score+=12000;
+ if(maker&&q.includes(maker))score+=3000;
  const fields=[
   {text:item.name,weight:5},
-  {text:item.maker,weight:3},
-  {text:item.kind,weight:2},
-  {text:item.size,weight:2}
+  {text:item.kind,weight:4},
+  {text:item.size,weight:3},
+  {text:item.code,weight:6},
+  {text:item.maker,weight:1}
  ];
  for(const field of fields){
   const text=normalizeSearchText(field.text);
@@ -320,10 +333,13 @@ function getSearchMatches(query){
  const groups=new Map();
  for(const item of PRODUCT_DB){
   const score=searchScore(query,item);if(!score)continue;
-  const key=item.maker+'\\u0000'+item.name;
+  const key=item.maker+'\u0000'+item.name;
   const current=groups.get(key);
-  if(!current)groups.set(key,{maker:item.maker,name:item.name,score,variants:1});
-  else{current.score=Math.max(current.score,score);current.variants++;}
+  if(!current)groups.set(key,{maker:item.maker,name:item.name,score,variants:1,item});
+  else{
+   current.variants++;
+   if(score>current.score){current.score=score;current.item=item;}
+  }
  }
  return [...groups.values()].sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name,'ja')).slice(0,150);
 }
@@ -354,29 +370,22 @@ function addItem(name='',qty=''){
  }
  function applySearchMatch(x){
   if(!x)return;
-  // 検索候補に含まれるメーカー・商品名をDB本体から引き直し、
-  // 表示名ではなく select の実値（DB_MAKERS / PRODUCT_DB の値）で選択する。
-  const qMaker=normalizeSearchText(x.maker);
-  const qName=normalizeSearchText(x.name);
-  const matchedItem=PRODUCT_DB.find(p=>
-   normalizeSearchText(p.maker)===qMaker && normalizeSearchText(p.name)===qName
-  );
+  // 検索スコアで選ばれた「商品＋バリエーション」の実レコードを使う。
+  // 同じ商品名の先頭バリエーションへ戻さず、品番・規格まで一致させる。
+  const matchedItem=x.item||PRODUCT_DB.find(p=>p.maker===x.maker&&p.name===x.name);
   if(!matchedItem)return;
   const makerKey=matchedItem.maker;
   const canonicalName=matchedItem.name;
   maker.value=makerKey;
-  // メーカー変更で商品一覧を作り直し、商品名も同時に選択する。
   fillProducts(canonicalName);
-  // 万一、表記揺れ等で通常処理が選択できなかった場合もDB実値で再設定。
-  if(product.value!==canonicalName){
-   const options=[...product.options];
-   const option=options.find(o=>normalizeSearchText(o.value)===qName);
-   if(option)product.value=option.value;
-  }
-  // 商品選択を確定してから、その商品のバリエーション一覧を有効化する。
-  fillVariants();
-  tr.querySelector('.iname').value=canonicalName;
-  // 仕入先欄だけを更新する。全行の商品選択を初期化する処理は呼ばない。
+  const variants=PRODUCT_DB.filter(p=>p.maker===makerKey&&p.name===canonicalName);
+  const queryNorm=normalizeSearchText(search.value);
+  const sizeWasSpecified=!!matchedItem.size&&queryNorm.includes(normalizeSearchText(matchedItem.size));
+  const variantIndex=sizeWasSpecified?variants.findIndex(p=>p===matchedItem || (
+   p.code===matchedItem.code&&p.kind===matchedItem.kind&&p.size===matchedItem.size
+  )):-1;
+  fillVariants(variantIndex);
+  tr.querySelector('.iname').value=[matchedItem.name,matchedItem.kind,matchedItem.size,matchedItem.code].filter(Boolean).join(' ');
   applyMakerToSupplier(makerKey,false);
  }
  function showSearch(){
@@ -659,8 +668,15 @@ let USUAL_DB_NAME_INDEX=null;
 const USUAL_DB_FUZZY_CACHE=new Map();
 function getUsualDbMatches(item,allowFuzzy=false){
  const norm=v=>normalizeSearchText(String(v||''));
- const target=norm(item.name);
+ const target=norm(item.name+' '+(item.variant||''));
  if(!target)return [];
+ // いつものリスト名に品番があれば、商品名の類似度より品番完全一致を優先する。
+ const codes=(String(item.name||'')+' '+String(item.variant||'')).match(/[A-Za-z]{1,6}[-ー－]?[0-9]{1,5}[A-Za-z0-9-]*/g)||[];
+ for(const rawCode of codes){
+  const code=norm(rawCode);
+  const exactCode=PRODUCT_DB.filter(p=>norm(p.code)===code);
+  if(exactCode.length)return exactCode;
+ }
  if(!USUAL_DB_NAME_INDEX){
   USUAL_DB_NAME_INDEX=new Map();
   for(const p of PRODUCT_DB){
@@ -670,17 +686,19 @@ function getUsualDbMatches(item,allowFuzzy=false){
    USUAL_DB_NAME_INDEX.get(key).push(p);
   }
  }
- const exact=USUAL_DB_NAME_INDEX.get(target)||[];
- if(exact.length)return exact;
- // あいまい検索は商品を実際に選択した時だけ1回実行し、結果をキャッシュする。
+ const exact=USUAL_DB_NAME_INDEX.get(norm(item.name))||[];
+ if(exact.length){
+  if(item.variant){
+   const v=norm(item.variant);
+   const narrowed=exact.filter(p=>norm([p.kind,p.size,p.code].join(' ')).includes(v));
+   if(narrowed.length)return narrowed;
+  }
+  return exact;
+ }
  if(!allowFuzzy)return [];
  if(USUAL_DB_FUZZY_CACHE.has(target))return USUAL_DB_FUZZY_CACHE.get(target);
- const matches=getSearchMatches(item.name);
- let result=[];
- if(matches.length){
-  const best=matches[0];
-  result=PRODUCT_DB.filter(p=>p.maker===best.maker&&p.name===best.name);
- }
+ const matches=getSearchMatches(item.name+' '+(item.variant||''));
+ const result=matches.length&&matches[0].item?[matches[0].item]:[];
  USUAL_DB_FUZZY_CACHE.set(target,result);
  return result;
 }
@@ -728,7 +746,7 @@ function addUsualItemToOrder(index){
  const maker=tr?.querySelector('.db-maker');
  if(maker){
   if(dbItem){
-   tr._setMaker?.(dbItem.maker,dbItem.name,x.variant||'');
+   tr._setMaker?.(dbItem.maker,dbItem.name,'');
    // DBに一致する商品がある場合はメーカー・商品を選択状態にする。
   }else{
    maker.value='ヒロヤ';tr._setMaker?.('ヒロヤ');
