@@ -348,10 +348,22 @@ function addItem(name='',qty=''){
  }
  function applySearchMatch(x){
   if(!x)return;
-  maker.value=x.maker;
-  fillProducts(x.name);
+  // 検索候補のメーカー・商品を、DBの実際のoption値に合わせて確実に選択する。
+  const makerKey=DB_MAKERS.find(m=>m===x.maker||makerLabel(m)===x.maker)||x.maker;
+  maker.value=makerKey;
+  fillProducts();
+  const productOption=[...product.options].find(o=>
+   o.value===x.name||normalizeSearchText(o.value)===normalizeSearchText(x.name)
+  );
+  if(productOption){
+   product.value=productOption.value;
+   fillVariants();
+  }else{
+   product.value='';
+   fillVariants();
+  }
   tr.querySelector('.iname').value=x.name;
-  applyMakerToSupplier(x.maker);
+  applyMakerToSupplier(makerKey);
  }
  function showSearch(){
   const q=search.value.trim();
