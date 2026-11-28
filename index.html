@@ -353,6 +353,21 @@ function getSearchMatches(query){
  }
  return [...groups.values()].sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name,'ja')).slice(0,150);
 }
+function buildDbItemDisplayName(item){
+ if(!item)return '';
+ const name=String(item.name||'').trim();
+ const parts=[name];
+ const base=normalizeSearchText(name);
+ const kind=String(item.kind||'').trim();
+ const size=String(item.size||'').trim();
+ const code=String(item.code||'').trim();
+ // KAシリーズは品番が商品名に含まれているため、末尾に品番を重ねない。
+ const isKaSeries=/^KA[-‐‑–—]?\d/i.test(code) || /\bKA[-‐‑–—]?\d/i.test(name);
+ if(kind && !base.includes(normalizeSearchText(kind)))parts.push(kind);
+ if(size && !base.includes(normalizeSearchText(size)))parts.push(size);
+ if(code && !isKaSeries && !base.includes(normalizeSearchText(code)))parts.push(code);
+ return parts.filter(Boolean).join(' ');
+}
 function addItem(name='',qty=''){
  const previous=$('itemRows').lastElementChild;
  const keepMaker=previous?.querySelector('.db-maker')?.value||'';
@@ -402,7 +417,7 @@ function addItem(name='',qty=''){
    p.code===matchedItem.code&&p.kind===matchedItem.kind&&p.size===matchedItem.size
   )):-1;
   fillVariants(variantIndex,variantCodeFilter);
-  tr.querySelector('.iname').value=[matchedItem.name,matchedItem.kind,matchedItem.size,matchedItem.code].filter(Boolean).join(' ');
+  tr.querySelector('.iname').value=buildDbItemDisplayName(matchedItem);
   applyMakerToSupplier(makerKey,false);
  }
  function showSearch(){
@@ -432,7 +447,7 @@ function addItem(name='',qty=''){
  product.addEventListener('change',()=>{variantCodeFilter='';fillVariants(-1,'')});
  variant.addEventListener('change',()=>{
   const x=variant._rows?.[Number(variant.value)];
-  if(x)tr.querySelector('.iname').value=[x.name,x.kind,x.size,x.code].filter(Boolean).join(' ');
+  if(x)tr.querySelector('.iname').value=buildDbItemDisplayName(x);
  });
  if(keepMaker){
   maker.value=keepMaker;
@@ -454,7 +469,7 @@ function addItem(name='',qty=''){
     vi=variants.findIndex(y=>norm([y.kind,y.size,y.code].filter(Boolean).join(' / '))===norm(variantText)
       || norm([y.kind,y.size,y.code].filter(Boolean).join(' '))===norm(variantText));
    }
-   if(vi>=0){variant.value=String(vi);const y=variants[vi];tr.querySelector('.iname').value=[y.name,y.kind,y.size,y.code].filter(Boolean).join(' ');}
+   if(vi>=0){variant.value=String(vi);const y=variants[vi];tr.querySelector('.iname').value=buildDbItemDisplayName(y);}
   }
  };
 }
