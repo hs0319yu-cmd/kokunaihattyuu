@@ -348,21 +348,28 @@ function addItem(name='',qty=''){
  }
  function applySearchMatch(x){
   if(!x)return;
-  // 検索候補のメーカー・商品を、DBの実際のoption値に合わせて確実に選択する。
-  const makerKey=DB_MAKERS.find(m=>m===x.maker||makerLabel(m)===x.maker)||x.maker;
-  maker.value=makerKey;
-  fillProducts();
-  const productOption=[...product.options].find(o=>
-   o.value===x.name||normalizeSearchText(o.value)===normalizeSearchText(x.name)
+  // 検索候補に含まれるメーカー・商品名をDB本体から引き直し、
+  // 表示名ではなく select の実値（DB_MAKERS / PRODUCT_DB の値）で選択する。
+  const qMaker=normalizeSearchText(x.maker);
+  const qName=normalizeSearchText(x.name);
+  const matchedItem=PRODUCT_DB.find(p=>
+   normalizeSearchText(p.maker)===qMaker && normalizeSearchText(p.name)===qName
   );
-  if(productOption){
-   product.value=productOption.value;
-   fillVariants();
-  }else{
-   product.value='';
-   fillVariants();
+  if(!matchedItem)return;
+  const makerKey=matchedItem.maker;
+  const canonicalName=matchedItem.name;
+  maker.value=makerKey;
+  // メーカー変更で商品一覧を作り直し、商品名も同時に選択する。
+  fillProducts(canonicalName);
+  // 万一、表記揺れ等で通常処理が選択できなかった場合もDB実値で再設定。
+  if(product.value!==canonicalName){
+   const options=[...product.options];
+   const option=options.find(o=>normalizeSearchText(o.value)===qName);
+   if(option)product.value=option.value;
   }
-  tr.querySelector('.iname').value=x.name;
+  // 商品選択を確定してから、その商品のバリエーション一覧を有効化する。
+  fillVariants();
+  tr.querySelector('.iname').value=canonicalName;
   applyMakerToSupplier(makerKey);
  }
  function showSearch(){
