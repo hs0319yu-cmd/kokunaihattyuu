@@ -331,7 +331,17 @@ function searchScore(query, item){
 }
 function getSearchMatches(query){
  const groups=new Map();
- for(const item of PRODUCT_DB){
+ // 品番が入力された場合は、まず同じ品番のDB行だけに絞る。
+ // KA-2VならKA-2BやKA-3など別品番の商品・バリエーションを混ぜない。
+ const rawCodes=String(query??'').match(/[A-Za-z]{1,6}[-ー－]?[0-9]{1,5}[A-Za-z0-9-]*/g)||[];
+ let source=PRODUCT_DB;
+ if(rawCodes.length){
+  const code=normalizeSearchText(rawCodes.sort((a,b)=>b.length-a.length)[0]);
+  const exact=PRODUCT_DB.filter(p=>normalizeSearchText(p.code)===code);
+  const prefix=exact.length?exact:PRODUCT_DB.filter(p=>normalizeSearchText(p.code).startsWith(code));
+  if(prefix.length)source=prefix;
+ }
+ for(const item of source){
   const score=searchScore(query,item);if(!score)continue;
   const key=item.maker+'\u0000'+item.name;
   const current=groups.get(key);
@@ -363,10 +373,13 @@ function addItem(name='',qty=''){
   product.innerHTML='<option value="">商品を選択</option>'+arr.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
   product.disabled=!maker.value;if(selected&&arr.includes(selected))product.value=selected;fillVariants();
  }
- function fillVariants(selectedIndex=-1){
-  const arr=PRODUCT_DB.filter(x=>x.maker===maker.value&&x.name===product.value);
+ let variantCodeFilter='';
+ function fillVariants(selectedIndex=-1,codeFilter=variantCodeFilter){
+  const all=PRODUCT_DB.filter(x=>x.maker===maker.value&&x.name===product.value);
+  const arr=codeFilter?all.filter(x=>normalizeSearchText(x.code)===normalizeSearchText(codeFilter)):all;
+  variant._rows=arr;
   variant.innerHTML='<option value="">バリエーションを選択</option>'+arr.map((x,i)=>`<option value="${i}">${esc([x.kind,x.size,x.code].filter(Boolean).join(' / ')||'標準')}</option>`).join('');
-  variant.disabled=!product.value;if(selectedIndex>=0&&arr[selectedIndex])variant.value=String(selectedIndex);
+  variant.disabled=!product.value||!arr.length;if(selectedIndex>=0&&arr[selectedIndex])variant.value=String(selectedIndex);
  }
  function applySearchMatch(x){
   if(!x)return;
@@ -378,13 +391,17 @@ function addItem(name='',qty=''){
   const canonicalName=matchedItem.name;
   maker.value=makerKey;
   fillProducts(canonicalName);
-  const variants=PRODUCT_DB.filter(p=>p.maker===makerKey&&p.name===canonicalName);
+  // 検索で品番が特定できた場合、バリエーション欄も同じ品番だけ表示する。
+  const queryCodes=String(search.value||'').match(/[A-Za-z]{1,6}[-ー－]?[0-9]{1,5}[A-Za-z0-9-]*/g)||[];
+  const exactQueryCode=queryCodes.map(normalizeSearchText).find(code=>normalizeSearchText(matchedItem.code)===code);
+  variantCodeFilter=exactQueryCode||'';
+  const variants=PRODUCT_DB.filter(p=>p.maker===makerKey&&p.name===canonicalName&&(!variantCodeFilter||normalizeSearchText(p.code)===variantCodeFilter));
   const queryNorm=normalizeSearchText(search.value);
   const sizeWasSpecified=!!matchedItem.size&&queryNorm.includes(normalizeSearchText(matchedItem.size));
   const variantIndex=sizeWasSpecified?variants.findIndex(p=>p===matchedItem || (
    p.code===matchedItem.code&&p.kind===matchedItem.kind&&p.size===matchedItem.size
   )):-1;
-  fillVariants(variantIndex);
+  fillVariants(variantIndex,variantCodeFilter);
   tr.querySelector('.iname').value=[matchedItem.name,matchedItem.kind,matchedItem.size,matchedItem.code].filter(Boolean).join(' ');
   applyMakerToSupplier(makerKey,false);
  }
@@ -411,10 +428,10 @@ function addItem(name='',qty=''){
  }
  search.addEventListener('input',showSearch);
  result.addEventListener('change',()=>applySearchMatch(result._matches?.[Number(result.value)]));
- maker.addEventListener('change',()=>{fillProducts();applyMakerToSupplier(maker.value)});
- product.addEventListener('change',()=>fillVariants());
+ maker.addEventListener('change',()=>{variantCodeFilter='';fillProducts();applyMakerToSupplier(maker.value)});
+ product.addEventListener('change',()=>{variantCodeFilter='';fillVariants(-1,'')});
  variant.addEventListener('change',()=>{
-  const x=PRODUCT_DB.filter(y=>y.maker===maker.value&&y.name===product.value)[Number(variant.value)];
+  const x=variant._rows?.[Number(variant.value)];
   if(x)tr.querySelector('.iname').value=[x.name,x.kind,x.size,x.code].filter(Boolean).join(' ');
  });
  if(keepMaker){
