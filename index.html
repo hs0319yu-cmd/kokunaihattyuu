@@ -439,11 +439,16 @@ function addItem(name='',qty=''){
   fillProducts(keepProduct);
   applyMakerToSupplier(keepMaker);
  }
- tr._setMaker=(makerKey,productName='',variantText='')=>{
-  maker.value=makerKey;fillProducts(productName);
+ tr._setMaker=(makerKey,productName='',variantText='',codeFilter='')=>{
+  maker.value=makerKey;
+  // いつものリストからの選択でも、品番があれば同じ品番の行だけを表示する。
+  variantCodeFilter=codeFilter?normalizeSearchText(codeFilter):'';
+  fillProducts(productName);
   if(productName&&product.value===productName){
-   const variants=PRODUCT_DB.filter(y=>y.maker===makerKey&&y.name===productName);
+   const allVariants=PRODUCT_DB.filter(y=>y.maker===makerKey&&y.name===productName);
    const norm=v=>normalizeSearchText(String(v||''));
+   const variants=variantCodeFilter?allVariants.filter(y=>norm(y.code)===variantCodeFilter):allVariants;
+   fillVariants(-1,variantCodeFilter);
    let vi=-1;
    if(variantText){
     vi=variants.findIndex(y=>norm([y.kind,y.size,y.code].filter(Boolean).join(' / '))===norm(variantText)
@@ -744,6 +749,9 @@ function addUsualItemToOrder(index){
  const x=USUAL_HIROYA_ITEMS[index];if(!x)return;
  const dbMatches=getUsualDbMatches(x,true);
  const dbItem=dbMatches[0]||null;
+ // いつものリストの商品名・規格から品番を取り出し、DB側も同じ品番だけに限定する。
+ const usualCodes=(String(x.name||'')+' '+String(x.variant||'')).match(/[A-Za-z]{1,6}[-ー－]?[0-9]{1,5}[A-Za-z0-9-]*/g)||[];
+ const usualCode=dbItem?usualCodes.map(normalizeSearchText).find(code=>normalizeSearchText(dbItem.code)===code)||'':'';
  const supplierName=$('supplierName').value.trim();
  if(supplierName&&supplierMakerKey(supplierName)&&supplierMakerKey(supplierName)!=='ヒロヤ'){
   if(!confirm('このリストはヒロヤの商品です。仕入先をヒロヤに切り替えますか？'))return;
@@ -763,8 +771,8 @@ function addUsualItemToOrder(index){
  const maker=tr?.querySelector('.db-maker');
  if(maker){
   if(dbItem){
-   tr._setMaker?.(dbItem.maker,dbItem.name,'');
-   // DBに一致する商品がある場合はメーカー・商品を選択状態にする。
+   tr._setMaker?.(dbItem.maker,dbItem.name,'',usualCode);
+   // DBに一致する商品がある場合はメーカー・商品を選択し、品番があれば同品番だけ表示する。
   }else{
    maker.value='ヒロヤ';tr._setMaker?.('ヒロヤ');
   }
