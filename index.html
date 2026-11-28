@@ -370,7 +370,8 @@ function addItem(name='',qty=''){
   // 商品選択を確定してから、その商品のバリエーション一覧を有効化する。
   fillVariants();
   tr.querySelector('.iname').value=canonicalName;
-  applyMakerToSupplier(makerKey);
+  // 仕入先欄だけを更新する。全行の商品選択を初期化する処理は呼ばない。
+  applyMakerToSupplier(makerKey,false);
  }
  function showSearch(){
   const q=search.value.trim();
@@ -420,12 +421,20 @@ function addItem(name='',qty=''){
   }
  };
 }
-function applyMakerToSupplier(maker){
+function applyMakerToSupplier(maker,applyToRows=true){
  if(!maker)return;
  const displayName=makerLabel(maker);
  const i=suppliers.findIndex(x=>x.name===maker||x.name===displayName);
- if(i>=0){$('supplierSelect').value=String(i);selectSupplier();}
- $('supplierName').value=displayName;
+ if(i>=0){
+  $('supplierSelect').value=String(i);
+  const x=suppliers[i];
+  $('supplierName').value=displayName;
+  $('supplierFax').value=x.fax;
+  $('supplierAddress').value=x.address||'';
+  if(applyToRows)setMakerForSupplier(x.name);
+ }else{
+  $('supplierName').value=displayName;
+ }
 }
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function newOrder(){if(confirm('注文内容をクリアして新規注文にしますか？')){ $('orderNo').value='';$('subject').value='';$('notes').value='';$('itemRows').innerHTML='';addItem();$('orderDate').value=new Date().toISOString().slice(0,10)}}
