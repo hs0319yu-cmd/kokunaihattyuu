@@ -356,16 +356,20 @@ function getSearchMatches(query){
 function buildDbItemDisplayName(item){
  if(!item)return '';
  const name=String(item.name||'').trim();
- const parts=[name];
- const base=normalizeSearchText(name);
  const kind=String(item.kind||'').trim();
  const size=String(item.size||'').trim();
  const code=String(item.code||'').trim();
- // KAシリーズは品番が商品名に含まれているため、末尾に品番を重ねない。
+ // KAシリーズは商品名に品番・規格が含まれているため、重複させずサイズだけ末尾に追加する。
  const isKaSeries=/^KA[-‐‑–—]?\d/i.test(code) || /\bKA[-‐‑–—]?\d/i.test(name);
+ if(isKaSeries){
+  const cleanName=name.replace(/\s+/g,' ').trim();
+  return [cleanName,size].filter(Boolean).join(' ');
+ }
+ const parts=[name];
+ const base=normalizeSearchText(name);
  if(kind && !base.includes(normalizeSearchText(kind)))parts.push(kind);
  if(size && !base.includes(normalizeSearchText(size)))parts.push(size);
- if(code && !isKaSeries && !base.includes(normalizeSearchText(code)))parts.push(code);
+ if(code && !base.includes(normalizeSearchText(code)))parts.push(code);
  return parts.filter(Boolean).join(' ');
 }
 function addItem(name='',qty=''){
@@ -393,7 +397,11 @@ function addItem(name='',qty=''){
   const all=PRODUCT_DB.filter(x=>x.maker===maker.value&&x.name===product.value);
   const arr=codeFilter?all.filter(x=>normalizeSearchText(x.code)===normalizeSearchText(codeFilter)):all;
   variant._rows=arr;
-  variant.innerHTML='<option value="">バリエーションを選択</option>'+arr.map((x,i)=>`<option value="${i}">${esc([x.kind,x.size,x.code].filter(Boolean).join(' / ')||'標準')}</option>`).join('');
+  const isKaProduct=/^KA[-‐‑–—]?\d/i.test(String(arr[0]?.code||'')) || /\bKA[-‐‑–—]?\d/i.test(String(product.value||''));
+  variant.innerHTML='<option value="">バリエーションを選択</option>'+arr.map((x,i)=>{
+   const label=isKaProduct?(String(x.size||'').trim()||'サイズ未登録'):[x.kind,x.size,x.code].filter(Boolean).join(' / ')||'標準';
+   return `<option value="${i}">${esc(label)}</option>`;
+  }).join('');
   variant.disabled=!product.value||!arr.length;if(selectedIndex>=0&&arr[selectedIndex])variant.value=String(selectedIndex);
  }
  function applySearchMatch(x){
@@ -466,7 +474,8 @@ function addItem(name='',qty=''){
    fillVariants(-1,variantCodeFilter);
    let vi=-1;
    if(variantText){
-    vi=variants.findIndex(y=>norm([y.kind,y.size,y.code].filter(Boolean).join(' / '))===norm(variantText)
+    vi=variants.findIndex(y=>norm(y.size)===norm(variantText)
+      || norm([y.kind,y.size,y.code].filter(Boolean).join(' / '))===norm(variantText)
       || norm([y.kind,y.size,y.code].filter(Boolean).join(' '))===norm(variantText));
    }
    if(vi>=0){variant.value=String(vi);const y=variants[vi];tr.querySelector('.iname').value=buildDbItemDisplayName(y);}
